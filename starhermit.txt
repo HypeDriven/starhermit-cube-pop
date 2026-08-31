@@ -1,0 +1,4 @@
+name=Cube Pop
+launch=index.html
+server=server.js
+

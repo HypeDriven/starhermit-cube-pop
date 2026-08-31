@@ -1,0 +1,98 @@
+[
+  {
+    "name": "ui-click",
+    "seconds": 1,
+    "prompt": "A short, crisp plastic button click, like tapping a small toy cube on a wooden table, dry and tight with no reverb.",
+    "event": "click"
+  },
+  {
+    "name": "invalid-buzz",
+    "seconds": 1,
+    "prompt": "A short low-pitched error buzz, like a small electric game buzzer denying a move, soft and not harsh.",
+    "event": "invalid"
+  },
+  {
+    "name": "cube-select",
+    "seconds": 1,
+    "prompt": "A very short soft plastic tick, like a fingertip lightly selecting one small wooden toy block, quiet and gentle.",
+    "event": "select"
+  },
+  {
+    "name": "cube-pop",
+    "seconds": 1,
+    "prompt": "A cluster of small plastic toy cubes popping and bursting apart, bright bubbly snap with a quick airy puff.",
+    "event": "pop"
+  },
+  {
+    "name": "rocket-forge",
+    "seconds": 1,
+    "prompt": "A quick rising mechanical whirr with a metallic snap, like a toy rocket being assembled and clicked into place.",
+    "event": "rocketCreate"
+  },
+  {
+    "name": "rocket-launch",
+    "seconds": 2,
+    "prompt": "A toy rocket launching with a whooshing burst of air and a fading fizzy trail, playful and punchy.",
+    "event": "rocketFire"
+  },
+  {
+    "name": "bomb-forge",
+    "seconds": 1,
+    "prompt": "A heavy rounded clunk with a short low hum, like a cartoon bomb being dropped onto a padded surface and armed.",
+    "event": "bombCreate"
+  },
+  {
+    "name": "bomb-blast",
+    "seconds": 2,
+    "prompt": "A deep muffled toy explosion, a soft booming thump with tumbling plastic debris, cartoonish rather than realistic.",
+    "event": "bombFire"
+  },
+  {
+    "name": "chain-surge",
+    "seconds": 2,
+    "prompt": "A rapid ascending series of bright metallic pings, like several small bells struck in quick sequence, energetic and sparkly.",
+    "event": "chain"
+  },
+  {
+    "name": "board-shuffle",
+    "seconds": 1,
+    "prompt": "Many small wooden blocks rattling and sliding against each other, like a box of toy cubes being quickly shaken.",
+    "event": "shuffle"
+  },
+  {
+    "name": "move-undo",
+    "seconds": 1,
+    "prompt": "A short descending tape-rewind whizz, like a small mechanism spinning backwards with a soft click at the end.",
+    "event": "undo"
+  },
+  {
+    "name": "hint-chime",
+    "seconds": 1,
+    "prompt": "A single gentle glass chime with a shimmering tail, like a small finger cymbal tapped once, clear and helpful.",
+    "event": "hint"
+  },
+  {
+    "name": "stage-win",
+    "seconds": 2,
+    "prompt": "A cheerful toy-like victory jingle, bright glockenspiel notes rising to a happy final chord with a small sparkle.",
+    "event": "win"
+  },
+  {
+    "name": "round-lose",
+    "seconds": 2,
+    "prompt": "A short sympathetic descending phrase on soft marimba, a gentle disappointed sigh of notes, warm not punishing.",
+    "event": "lose"
+  },
+  {
+    "name": "wave-clear",
+    "seconds": 1,
+    "prompt": "A quick ascending sweep of airy chimes, like a curtain of small bells being lifted, bright and brief.",
+    "event": "wave"
+  },
+  {
+    "name": "achievement-unlock",
+    "seconds": 2,
+    "prompt": "A sparkling magical unlock sound, a bright chime arpeggio with a tiny metal key turn and a shimmering finish.",
+    "event": "achievement"
+  }
+]

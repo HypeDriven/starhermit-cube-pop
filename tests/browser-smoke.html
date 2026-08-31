@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<!-- Browser smoke test: loads the real game, clicks Play, pops a group via
+     the accessibility mirror, and reports PASS/FAIL in #smoke-result.
+     Run headless: google-chrome --headless=new --dump-dom .../tests/browser-smoke.html -->
+<html lang="en">
+<head><meta charset="utf-8"><title>smoke</title></head>
+<body>
+<pre id="smoke-result">RUNNING</pre>
+<iframe id="game" src="../index.html" style="width:1200px;height:800px"></iframe>
+<script>
+const out = [];
+function log(m) { out.push(m); document.getElementById('smoke-result').textContent = out.join('\n'); }
+function fail(m) { log('FAIL: ' + m); finish(1); }
+function finish(code) { document.title = code ? 'SMOKE-FAIL' : 'SMOKE-PASS'; log(code ? 'SMOKE FAIL' : 'SMOKE PASS'); }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+(async () => {
+  const w = document.getElementById('game').contentWindow;
+  await new Promise(r => { document.getElementById('game').onload = r; });
+  await sleep(400);
+  const d = w.document;
+  if (!w.CPRules || !w.CPContent || !w.CPSession || !w.CPAudio || !w.CPUI) return fail('modules missing');
+  log('modules loaded');
+  // title rendered
+  if (!d.getElementById('btn-play')) return fail('no play button');
+  // start journey stage 1
+  d.getElementById('btn-play').click();
+  await sleep(300);
+  if (d.getElementById('screen-game').hidden) return fail('game screen not shown');
+  // countdown takes ~2.1s (skip if reduced motion)
+  await sleep(2600);
+  const st = () => w.__smokeSession ? w.__smokeSession() : null;
+  // find a legal pop via the mirror
+  const state = (() => {
+    // access the session through the mirror grid's data
+    return null;
+  })();
+  // click first enabled mirror cell whose label says 'group of 2' or more
+  const cells = [...d.querySelectorAll('#board-mirror button')];
+  if (!cells.length) return fail('mirror empty');
+  const target = cells.find(b => /group of ([2-9]|\d\d)/.test(b.getAttribute('aria-label')));
+  if (!target) return fail('no poppable mirror cell');
+  const scoreBefore = d.getElementById('hud-score').textContent;
+  target.click();
+  await sleep(1500);
+  const scoreAfter = d.getElementById('hud-score').textContent;
+  if (scoreBefore === scoreAfter) return fail('score did not change after pop (' + scoreBefore + ')');
+  log('pop changed score: ' + scoreBefore + ' → ' + scoreAfter);
+  // canvas exists (WebGL) or fallback engaged
+  const canvas = d.querySelector('#gl-container canvas');
+  log(canvas ? 'webgl canvas present' : 'no canvas (grid-only fallback)');
+  // pause + resume
+  d.getElementById('btn-pause').click();
+  await sleep(200);
+  if (d.getElementById('overlay-pause').hidden) return fail('pause overlay missing');
+  d.getElementById('btn-resume-round').click();
+  await sleep(200);
+  if (!d.getElementById('overlay-pause').hidden) return fail('resume failed');
+  log('pause/resume works');
+  // hint + undo buttons exist and respond
+  d.getElementById('btn-hint').click();
+  await sleep(150);
+  d.getElementById('btn-undo').click();
+  await sleep(150);
+  const scoreUndone = d.getElementById('hud-score').textContent;
+  if (scoreUndone !== scoreBefore) return fail('undo did not restore score (' + scoreUndone + ' vs ' + scoreBefore + ')');
+  log('hint + undo work');
+  finish(0);
+})().catch(e => fail(e.message));
+</script>
+</body>
+</html>
