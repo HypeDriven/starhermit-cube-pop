@@ -79,7 +79,9 @@
       return r.json();
     }).then(function (body) {
       var t1 = Date.now();
-      timeOffset = body.now - Math.round((t0 + t1) / 2);
+      var serverNow = typeof body.now === 'number' ? body.now : body.serverTime;
+      if (typeof serverNow !== 'number') throw new Error('invalid time response');
+      timeOffset = serverNow - Math.round((t0 + t1) / 2);
       return timeOffset;
     }).catch(function () { timeOffset = 0; return 0; });
   }
