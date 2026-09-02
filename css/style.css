@@ -24,7 +24,6 @@ body {
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--ink);
-  overflow: hidden;
   display: flex; flex-direction: column;
 }
 body.large-text { font-size: 20px; }
@@ -60,6 +59,7 @@ body.high-contrast {
 #main { flex: 1 1 auto; position: relative; min-height: 0; overflow: auto; }
 
 .screen { padding: 16px calc(16px + var(--sar)) calc(16px + var(--sab)) calc(16px + var(--sal)); max-width: 70ch; margin: 0 auto; }
+[hidden] { display: none !important; }
 .screen h2 { margin-top: 8px; }
 
 /* ---------- buttons ---------- */
@@ -134,7 +134,7 @@ body.high-contrast {
 #gl-container { position: absolute; inset: 0; border-radius: var(--radius); overflow: hidden; }
 #gl-container canvas { display: block; width: 100%; height: 100%; }
 #action-tray {
-  grid-area: tray; display: flex; justify-content: center; gap: 8px;
+  grid-area: tray; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
   padding: 6px 6px calc(6px + var(--sab));
 }
 body.left-handed #action-tray { flex-direction: row-reverse; }
