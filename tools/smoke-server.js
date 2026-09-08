@@ -4,11 +4,16 @@
  */
 'use strict';
 const assert = require('assert');
+const fs = require('fs');
+const testData = fs.mkdtempSync(require('path').join(require('os').tmpdir(), 'cube-pop-test-'));
+process.env.CUBE_POP_DATA_DIR = testData;
+process.env.PORT = '0';
+process.on('exit', () => fs.rmSync(testData, { recursive: true, force: true }));
 const server = require('../server.js');
 const Rules = require('../js/rules.js');
 const Content = require('../js/content.js');
 
-const BASE = 'http://127.0.0.1:' + (process.env.PORT || 8090);
+let BASE;
 
 async function get(path) {
   const r = await fetch(BASE + path);
@@ -24,6 +29,7 @@ async function postJSON(path, obj) {
 (async () => {
   await new Promise(res => { if (server.listening) res(); else server.on('listening', res); });
 
+  BASE = 'http://127.0.0.1:' + server.address().port;
   // static: launch file + resources
   for (const p of ['/', '/index.html', '/css/style.css', '/js/rules.js', '/js/render.js',
                    '/js/ui.js', '/js/main.js', '/vendor/three.module.min.js', '/starhermit.txt']) {

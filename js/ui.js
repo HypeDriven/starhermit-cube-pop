@@ -74,6 +74,7 @@
       app.renderer.setReducedMotion(!!s.reducedMotion);
       app.renderer.setQuality(resolveTier(s.quality));
       var theme = themeById(s.theme);
+      if (!themeUnlocked(theme)) theme = Content.THEMES[0]; // e.g. after a progress reset
       app.renderer.setTheme(theme.palette, Content.COLORS, !!s.highContrast);
       if (app.session) app.renderer.syncToState(app.session.state);
     }
@@ -569,7 +570,12 @@
     setState('resolving', 'pop');
     app.inputLocked = true;
     if (app.renderer) app.renderer.setHintCell(null);
-    handleEvents(res.events, app.session.state, function () {
+    var round = app.session;
+    handleEvents(res.events, round.state, function finishPop() {
+      // The player may have paused and restarted/left while the animation
+      // played out; never apply a stale round's completion to the new one.
+      if (app.session !== round) return;
+      if (app.state === 'paused') { app.pendingResolution = finishPop; return; }
       updateHUD();
       if (app.session.state.terminal) { endRound(res.events); return; }
       if (app.session.lesson && app.session.lessonGoalMet()) { lessonComplete(); return; }
@@ -775,9 +781,16 @@
     app.lastFocusEl = document.activeElement;
     $('overlay-pause').hidden = false;
     $('btn-resume-round').focus();
-    app.session.saveSnapshot();
+    // Tutorial lessons are short and restartable; leaving them never saves a
+    // snapshot (see leaveRound), so pausing shouldn't either — a resumed
+    // session would lack its lesson object and could never complete.
+    if (app.session.kind !== 'tutorial') {
+      app.session.saveSnapshot();
+      announce('Paused. Round saved locally.');
+    } else {
+      announce('Paused.');
+    }
     Audio.suspendAll();
-    announce('Paused. Round saved locally.');
   }
 
   function resumeRound() {
@@ -787,6 +800,7 @@
     app.pausedAt = 0;
     setState('active', 'resume');
     Audio.resumeAll();
+    if (app.pendingResolution) { var finish = app.pendingResolution; app.pendingResolution = null; finish(); }
     if (app.lastFocusEl && app.lastFocusEl.focus) app.lastFocusEl.focus();
     announce('Resumed.');
   }
@@ -972,9 +986,54 @@
     if (app.renderer) { app.renderer.syncToState(app.session.state); app.renderer.setHintCell(null); }
     updateHUD();
     announce('Move undone. Score ' + Rules.currentScore(app.session.state) + '.');
+    // Lesson goals can be met by undoing (e.g. the "Second chances" lesson).
+    if (app.session.lesson && app.session.lessonGoalMet()) lessonComplete();
   }
 
   // ------------------------------------------------------------- title nav
+  // The hero canvas is decorative (aria-hidden): a soft cube mosaic in the
+  // game's own palette, drawn once in 2D so the title screen never shows a
+  // blank frame even before (or without) the WebGL studio.
+  function drawTitleHero() {
+    var cv = $('title-canvas');
+    if (!cv || !cv.getContext) return;
+    var g = cv.getContext('2d');
+    if (!g) return;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var w = cv.clientWidth || 600, h = cv.clientHeight || 260;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    g.scale(dpr, dpr);
+    var theme = themeById(app.settings.theme);
+    var hex = function (n) { return '#' + n.toString(16).padStart(6, '0'); };
+    g.fillStyle = hex(theme.palette.wall);
+    g.fillRect(0, 0, w, h);
+    var rng = root.CPRNG.derive(0xcbf29ce4, root.CPRNG.STREAM_DECOR);
+    var size = 44, gap = 12, step = size + gap;
+    var cols = Math.ceil(w / step) + 1, rows = Math.ceil(h / step) + 1;
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        var def = Content.COLORS[rng.int(Content.COLORS.length)];
+        var x = c * step + (r % 2 ? step / 2 : 0) - step / 2;
+        var y = r * step - step / 2;
+        var rad = size * 0.22, rr = size / 2;
+        g.save();
+        g.translate(x + rr, y + rr);
+        g.globalAlpha = 0.85;
+        g.fillStyle = hex(def.color);
+        g.beginPath();
+        if (g.roundRect) g.roundRect(-rr, -rr, size, size, rad);
+        else g.rect(-rr, -rr, size, size);
+        g.fill();
+        g.globalAlpha = 1;
+        g.fillStyle = 'rgba(255,246,232,0.9)';
+        g.font = 'bold ' + Math.round(size * 0.42) + 'px sans-serif';
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(def.icon, 0, 1);
+        g.restore();
+      }
+    }
+  }
+
   function bindNav() {
     document.querySelectorAll('[data-goto]').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -1044,6 +1103,8 @@
       c._t = setTimeout(function () { c.textContent = ''; }, 1800);
     });
     applySettings();
+    drawTitleHero();
+    window.addEventListener('resize', drawTitleHero);
     bindNav();
     bindGameInput();
     bindSettings();

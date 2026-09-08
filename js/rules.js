@@ -159,7 +159,7 @@
   function checkPop(state, r, c) {
     if (state.terminal) return INVALID.ENDED;
     if (!inBounds(state, r, c)) return INVALID.BAD_LOC;
-    var cell = state.grid[r][c];
+    var cell = cellAt(state, r, c);
     if (!cell) return INVALID.EMPTY;
     if (cell.s !== S_NONE) return null; // firing a special is always legal
     var min = state.cfg.minGroup || 2;

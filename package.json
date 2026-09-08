@@ -1,0 +1,12 @@
+{
+  "name": "cube-pop",
+  "private": true,
+  "scripts": {
+    "test": "node tests/rules.test.js",
+    "test:e2e": "node tests/e2e.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.62.1"
+  },
+  "license": "PolyForm-Noncommercial-1.0.0"
+}

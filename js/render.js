@@ -191,6 +191,8 @@ export class BoardRenderer {
   // ---------- theme / environment ----------
   setTheme(palette, colorDefs, highContrast) {
     this.palette = palette;
+    this._colorDefs = colorDefs;
+    this._hc = highContrast;
     this.colors = colorDefs.map(d => highContrast ? d.colorHC : d.color);
     this.scene.background = hex(palette.wall);
     this.scene.fog = new THREE.Fog(hex(palette.fog), 18, 40);

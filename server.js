@@ -14,7 +14,7 @@ const path = require('path');
 
 const ROOT = __dirname;
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8090;
-const DATA_DIR = path.join(ROOT, 'data');
+const DATA_DIR = process.env.CUBE_POP_DATA_DIR || path.join(ROOT, 'data');
 const BOARD_FILE = path.join(DATA_DIR, 'daily-boards.json');
 
 const Rules = require('./js/rules.js');
@@ -24,6 +24,7 @@ const RNG = require('./js/rng.js');
 const MIME = {
   '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
   '.json': 'application/json', '.txt': 'text/plain', '.svg': 'image/svg+xml',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon',
   '.opus': 'audio/ogg'
 };
 const MAX_BODY = 256 * 1024;
@@ -179,7 +180,10 @@ const server = http.createServer((req, res) => {
   let rel = p;
   if (rel === '/' || rel === '') rel = '/index.html';
   const file = path.normalize(path.join(ROOT, rel));
-  if (!file.startsWith(ROOT) || file.indexOf(path.join(ROOT, 'data')) === 0) {
+  const inRoot = file === ROOT || file.startsWith(ROOT + path.sep);
+  const inData = file === path.join(ROOT, 'data') ||
+    file.startsWith(path.join(ROOT, 'data') + path.sep);
+  if (!inRoot || inData || rel.split(/[\\/]/).some(part => part.startsWith('.'))) {
     res.writeHead(403); res.end(); return;
   }
   if (fs.existsSync(file) && fs.statSync(file).isFile()) {
