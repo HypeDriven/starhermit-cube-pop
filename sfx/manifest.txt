@@ -1,0 +1,25 @@
+# Cube Pop — SFX manifest (canonical). One clip per line:
+# file | event id (CPAudio method name, js/audio.js EVENT_SAMPLES) | description of the sound | usage context
+# Clips: MOSS-SoundEffect v2.0, 48 kHz mono Opus 96 kbps VBR, loudness-normalised (-20 LUFS), 100 steps.
+# One-shots play on the effects bus; studio-ambience loops on the ambience bus. Every event keeps a WebAudio synth fallback while its clip is loading or if it fails.
+ui-click.opus | click | Short crisp plastic button click, like tapping a small toy cube on a wooden table, dry and tight, no reverb | Every title/menu navigation button and Play/Resume press (ui.js bindNav)
+invalid-buzz.opus | invalid | Short low-pitched error buzz from a small electric game buzzer, soft not harsh | Rules rejected a pop: group too small, empty cell, off-board, round ended (ui.js tryPop); paired with a toast and an assertive live-region message
+cube-select.opus | select | Very short soft plastic tick, a fingertip lightly selecting one small wooden block, quiet and gentle | Keyboard focus ring moved with the arrow keys during play (ui.js bindGameInput)
+cube-pop.opus | pop | Cluster of small plastic toy cubes popping and bursting apart, bright bubbly snap with a quick airy puff | A legal group pops (rules 'pop' event); size is spoken in the caption
+rocket-forge.opus | rocketCreate | Quick rising mechanical whirr with a metallic snap, a toy rocket assembled and clicked into place | Group of rocketAt+ cubes leaves a row/column rocket on the tapped cell (rules 'special-create', special 1 or 2)
+rocket-launch.opus | rocketFire | Toy rocket launching with a whooshing burst of air and a fading fizzy trail, playful and punchy | Player taps a rocket; its line clears (rules 'fire', special 1 or 2)
+bomb-forge.opus | bombCreate | Heavy rounded clunk with a short low hum, a cartoon bomb dropped onto a padded surface and armed | Group of bombAt+ cubes leaves a bomb on the tapped cell (rules 'special-create', special 3)
+bomb-blast.opus | bombFire | Deep muffled toy explosion, soft booming thump with tumbling plastic debris, cartoonish not realistic | Player taps a bomb; 3x3 area clears (rules 'fire', special 3)
+chain-surge.opus | chain | Rapid ascending series of bright metallic pings, several small bells struck in quick sequence, sparkly | Two or more specials detonate in one move (rules 'chain' event); layered after the fire cue
+board-shuffle.opus | shuffle | Many small wooden blocks rattling and sliding together, a box of toy cubes shaken quickly | Deadlock guard reshuffled the wall because no legal move remained (rules 'shuffle' event)
+move-undo.opus | undo | Short descending tape-rewind whizz, a small mechanism spinning backwards with a soft click at the end | Undo button / U key restored the previous board (ui.js doUndo)
+hint-chime.opus | hint | Single gentle glass chime with a shimmering tail, a small finger cymbal tapped once, clear and helpful | Hint button / H key highlighted a suggested cell (ui.js doHint)
+stage-win.opus | win | Cheerful toy-like victory jingle, bright glockenspiel notes rising to a happy final chord with a small sparkle | All colour goals met (rules 'win'); also the Learn lesson-complete cue
+round-lose.opus | lose | Short sympathetic descending phrase on soft marimba, a gentle disappointed sigh of notes, warm not punishing | Move limit, time limit or move bank exhausted, or resigned (rules 'lose')
+wave-clear.opus | wave | Quick ascending sweep of airy chimes, a curtain of small bells lifted, bright and brief | Score Chase wave complete: new goals dealt and moves banked (rules 'wave' event)
+achievement-unlock.opus | achievement | Sparkling magical unlock sound, bright chime arpeggio with a tiny metal key turn and a shimmering finish | An achievement key unlocked for the first time (ui.js award), with toast + announcement
+countdown-tick.opus | countdownTick | Single soft wooden xylophone tap, one short rounded mallet note on a toy xylophone bar, clean and dry | Each of the "3", "2", "1" steps of the pre-round countdown (ui.js runCountdown; skipped under reduced motion)
+countdown-go.opus | countdownGo | Bright cheerful toy whistle pip followed by a small plastic pop, a quick playful go signal | The final "Pop!" step of the countdown, right before input unlocks
+goal-fill.opus | goalFill | Short satisfied two-note marimba ding with a soft wooden knock, a lid clicking shut on a full toy box | One colour quota in the goal rail reaches its target mid-round (ui.js tryPop via goalsFilled); not played on the winning pop
+time-warning.opus | timeWarning | Quick urgent double tick of a small plastic kitchen timer, two crisp mechanical clicks close together, tense not harsh | Once per timed round when the clock first drops under 15 s (ui.js updateClock); HUD time turns red at the same moment
+studio-ambience.opus | ambience | Quiet indoor room tone of a cosy toy workshop: soft warm air hum, faint distant wooden creaks, gentle muffled clock ticking, no sudden events | 12 s loop on the ambience bus for the whole round (audio.js startAmbience); stops when the player leaves to the menu

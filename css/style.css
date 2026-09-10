@@ -81,8 +81,11 @@ body.high-contrast {
 
 /* ---------- title ---------- */
 #screen-title { display: flex; gap: 24px; max-width: 900px; align-items: center; }
-.title-hero { flex: 1 1 40%; min-height: 220px; }
+.title-hero { flex: 1 1 40%; min-height: 220px; position: relative; }
 #title-canvas { width: 100%; height: 260px; border-radius: var(--radius); display: block; }
+/* Key art sits over the procedural mosaic; if it fails to load the canvas shows through. */
+#title-keyart { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  border-radius: var(--radius); box-shadow: 0 6px 24px #3d2f2333; }
 .title-menu { flex: 1 1 55%; }
 .title-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 12px; }
 
@@ -170,6 +173,8 @@ body.left-handed #action-tray { flex-direction: row-reverse; }
 .overlay-wide { max-width: 560px; }
 .countdown-num { font-size: 6rem; font-weight: 800; color: #fff; text-shadow: 0 4px 24px #0008; }
 
+.results-banner { width: 100%; aspect-ratio: 16 / 5; object-fit: cover; border-radius: 10px;
+  display: block; margin: 2px 0 8px; max-height: 150px; }
 .results-headline { font-size: 1.3rem; font-weight: 700; margin: 4px 0; }
 .breakdown-table { width: 100%; border-collapse: collapse; margin: 8px 0; }
 .breakdown-table td { padding: 4px 6px; border-bottom: 1px solid #0001; }
@@ -213,6 +218,7 @@ body.left-handed #action-tray { flex-direction: row-reverse; }
   .screen-game { gap: 4px; }
   #rail-right { flex-wrap: wrap; gap: 10px; }
   .overlay-card { padding: 14px; }
+  .results-banner { max-height: 96px; }
 }
 
 /* ---------- landscape mobile: narrow status rail ---------- */

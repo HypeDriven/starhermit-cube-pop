@@ -23,7 +23,10 @@
     bombCreate: 'bomb-forge', bombFire: 'bomb-blast', chain: 'chain-surge',
     shuffle: 'board-shuffle', undo: 'move-undo', hint: 'hint-chime',
     win: 'stage-win', lose: 'round-lose', wave: 'wave-clear',
-    achievement: 'achievement-unlock'
+    achievement: 'achievement-unlock',
+    countdownTick: 'countdown-tick', countdownGo: 'countdown-go',
+    goalFill: 'goal-fill', timeWarning: 'time-warning',
+    ambience: 'studio-ambience'
   };
   var sampleCache = {};    // basename -> { buffer, loading, failed }
 
@@ -220,10 +223,41 @@
       if (playSample(EVENT_SAMPLES.achievement)) return;
       blip('effects', 990, 0.25, 'sine', 0.2, 1320);
     },
+    countdownTick: function () {
+      if (playSample(EVENT_SAMPLES.countdownTick)) return;
+      blip('effects', 660, 0.06, 'triangle', 0.12);
+    },
+    countdownGo: function () {
+      if (playSample(EVENT_SAMPLES.countdownGo)) return;
+      blip('effects', 880, 0.12, 'triangle', 0.16, 1320);
+    },
+    goalFill: function () {
+      caption('Goal filled.');
+      if (playSample(EVENT_SAMPLES.goalFill)) return;
+      blip('effects', 740, 0.12, 'triangle', 0.16);
+      setTimeout(function () { blip('effects', 988, 0.16, 'triangle', 0.16); }, 90);
+    },
+    timeWarning: function () {
+      caption('15 seconds left.');
+      if (playSample(EVENT_SAMPLES.timeWarning)) return;
+      blip('effects', 1200, 0.05, 'square', 0.1);
+      setTimeout(function () { blip('effects', 1200, 0.05, 'square', 0.1); }, 110);
+    },
 
     // ---- ambience: soft filtered hum + slow random ticks ----
     startAmbience: function () {
       if (!ensureCtx() || ambienceNodes.length) return;
+      // Authored room tone (studio-ambience.opus) loops on the ambience bus
+      // once decoded; until then (or if it fails) the synth hum below runs.
+      var bed = sampleCache[EVENT_SAMPLES.ambience];
+      if (bed && bed.buffer) {
+        var src = ctx.createBufferSource(); src.buffer = bed.buffer; src.loop = true;
+        var bg = ctx.createGain(); bg.gain.value = 0.35;
+        src.connect(bg); bg.connect(buses.ambience); src.start();
+        ambienceNodes = [src, bg];
+        return;
+      }
+      loadSample(EVENT_SAMPLES.ambience);
       var o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 88;
       var o2 = ctx.createOscillator(); o2.type = 'sine'; o2.frequency.value = 132.5;
       var g = ctx.createGain(); g.gain.value = 0.05;

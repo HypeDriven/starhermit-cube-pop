@@ -38,6 +38,7 @@
     pausedAt: 0,
     cmdSeq: 0,
     clockTimer: null,
+    timeWarned: false,       // one 15-second warning per round
     lastFocusEl: null,
     currentList: null,       // which list screen a round was launched from
     currentIdx: 0,
@@ -375,6 +376,11 @@
       $('hud-time-wrap').hidden = false;
       $('hud-time').textContent = Math.ceil(remain / 1000) + 's';
       $('hud-time-wrap').classList.toggle('danger', remain < 15000);
+      if (remain < 15000 && remain > 0 && !st.terminal && !app.timeWarned && app.state === 'active') {
+        app.timeWarned = true;
+        Audio.timeWarning();
+        announce('15 seconds left.');
+      }
       if (remain <= 0 && !st.terminal) {
         var res = app.session.tickClock();
         if (res && res.ok && res.state.terminal) endRound(res.events);
@@ -480,6 +486,7 @@
     showScreen('game');
     app.session = new Sess.Session(cfg, opts);
     app.cmdSeq = 0;
+    app.timeWarned = false;
     app.inputLocked = true;
 
     ensureRenderer();
@@ -520,6 +527,13 @@
     app.clockTimer = setInterval(updateClock, 250);
   }
 
+  // Number of colour quotas already met (used for the goal-fill cue).
+  function goalsFilled(st) {
+    var n = 0;
+    Object.keys(st.cfg.goals).forEach(function (g) { if ((st.goals[g] || 0) >= st.cfg.goals[g]) n++; });
+    return n;
+  }
+
   function legalSummary() {
     var acts = Rules.legalActions(app.session.state);
     var groups = acts.filter(function (a) { return a.kind === 'pop'; });
@@ -537,7 +551,7 @@
       if (i < seq.length) {
         num.textContent = seq[i];
         announce(seq[i]);
-        Audio.click();
+        if (i === seq.length - 1) Audio.countdownGo(); else Audio.countdownTick();
         i++;
         setTimeout(step, i === seq.length ? 400 : 550);
       } else {
@@ -552,6 +566,7 @@
     if (app.session.state.terminal) return;
     Audio.unlock();
     var id = 'c' + (++app.cmdSeq) + '-' + Date.now().toString(36);
+    var goalsBefore = goalsFilled(app.session.state);
     var res = app.session.pop(r, c, id);
     if (!res.ok) {
       if (res.duplicate) return;
@@ -569,6 +584,7 @@
     }
     setState('resolving', 'pop');
     app.inputLocked = true;
+    if (!res.state.terminal && goalsFilled(res.state) > goalsBefore) Audio.goalFill();
     if (app.renderer) app.renderer.setHintCell(null);
     var round = app.session;
     handleEvents(res.events, round.state, function finishPop() {
@@ -688,6 +704,8 @@
       'resigned': 'Round resigned'
     }[st.terminal.reason] || 'Round over';
     $('results-headline').textContent = (won ? 'You win — ' : '') + reasonText;
+    var banner = $('results-banner');
+    banner.hidden = !won || banner.dataset.failed === '1';
     announce('Round over. ' + reasonText + ' Score ' + st.score.total + '.');
 
     var tb = $('results-breakdown').querySelector('tbody');
@@ -762,6 +780,7 @@
     var ov = $('overlay-results');
     ov.hidden = false;
     $('results-headline').textContent = 'Lesson complete: ' + lesson.title;
+    $('results-banner').hidden = $('results-banner').dataset.failed === '1';
     announce('Lesson complete: ' + lesson.title);
     $('results-breakdown').querySelector('tbody').innerHTML = '';
     $('results-stars').textContent = '';
@@ -816,6 +835,7 @@
     }
     app.session = null;
     Audio.stopMusic();
+    Audio.stopAmbience();
     goHome();
   }
 
@@ -942,6 +962,7 @@
       $('overlay-results').hidden = true;
       app.session = null;
       Audio.stopMusic();
+      Audio.stopAmbience();
       goHome();
     };
     $('btn-copy-replay').onclick = function () {
@@ -1076,6 +1097,7 @@
       }
       $('lesson-box').hidden = true;
       updateHUD();
+      app.timeWarned = false;
       Audio.startAmbience();
       Audio.startMusic(0);
       runCountdown(function () {

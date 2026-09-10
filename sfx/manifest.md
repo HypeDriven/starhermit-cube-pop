@@ -20,3 +20,8 @@ Generated with MOSS-SoundEffect v2.0, 48 kHz mono Opus (96 kbps VBR, loudness-no
 | round-lose.opus | lose | A short sympathetic descending phrase on soft marimba, a gentle disappointed sigh of notes, warm not punishing. |
 | wave-clear.opus | wave | A quick ascending sweep of airy chimes, like a curtain of small bells being lifted, bright and brief. |
 | achievement-unlock.opus | achievement | A sparkling magical unlock sound, a bright chime arpeggio with a tiny metal key turn and a shimmering finish. |
+| countdown-tick.opus | countdownTick | A single soft wooden xylophone tap, one short rounded mallet note on a toy xylophone bar, clean and dry with a tiny ring. |
+| countdown-go.opus | countdownGo | A bright cheerful toy whistle pip followed by a small plastic pop, a quick playful go signal, short and upbeat. |
+| goal-fill.opus | goalFill | A short satisfied two-note marimba ding with a soft wooden knock, like a lid clicking shut on a full toy box, warm and rewarding. |
+| time-warning.opus | timeWarning | A quick urgent double tick of a small plastic kitchen timer, two crisp mechanical clicks close together, tense but not harsh. |
+| studio-ambience.opus | ambience | Quiet indoor room tone of a cozy toy workshop, soft warm air hum, faint distant wooden creaks and gentle muffled clock ticking, calm and continuous with no sudden events. |

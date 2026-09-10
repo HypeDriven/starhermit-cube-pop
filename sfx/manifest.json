@@ -94,5 +94,35 @@
     "seconds": 2,
     "prompt": "A sparkling magical unlock sound, a bright chime arpeggio with a tiny metal key turn and a shimmering finish.",
     "event": "achievement"
+  },
+  {
+    "name": "countdown-tick",
+    "seconds": 1,
+    "prompt": "A single soft wooden xylophone tap, one short rounded mallet note on a toy xylophone bar, clean and dry with a tiny ring.",
+    "event": "countdownTick"
+  },
+  {
+    "name": "countdown-go",
+    "seconds": 1,
+    "prompt": "A bright cheerful toy whistle pip followed by a small plastic pop, a quick playful go signal, short and upbeat.",
+    "event": "countdownGo"
+  },
+  {
+    "name": "goal-fill",
+    "seconds": 1,
+    "prompt": "A short satisfied two-note marimba ding with a soft wooden knock, like a lid clicking shut on a full toy box, warm and rewarding.",
+    "event": "goalFill"
+  },
+  {
+    "name": "time-warning",
+    "seconds": 1,
+    "prompt": "A quick urgent double tick of a small plastic kitchen timer, two crisp mechanical clicks close together, tense but not harsh.",
+    "event": "timeWarning"
+  },
+  {
+    "name": "studio-ambience",
+    "seconds": 12,
+    "prompt": "Quiet indoor room tone of a cozy toy workshop, soft warm air hum, faint distant wooden creaks and gentle muffled clock ticking, calm and continuous with no sudden events.",
+    "event": "ambience"
   }
 ]

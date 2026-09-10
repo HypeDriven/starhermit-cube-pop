@@ -84,6 +84,7 @@ export class BoardRenderer {
     this._initScene();
     this._initParticles();
     this._initInput();
+    this._loadWoodTexture();
     this._loop = this._loop.bind(this);
     this._last = performance.now();
     requestAnimationFrame(this._loop);
@@ -102,6 +103,22 @@ export class BoardRenderer {
     this._onResize = this._resize.bind(this);
     window.addEventListener('resize', this._onResize);
     this._resize();
+  }
+
+  // Authored wood grain for the table top (assets/table-wood.webp). Loads
+  // lazily; until it arrives (or if it fails) the flat theme colour stands.
+  _loadWoodTexture() {
+    this.woodTex = null;
+    try {
+      new THREE.TextureLoader().load('assets/table-wood.webp', (tex) => {
+        if (this.disposed) { tex.dispose(); return; }
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(3, 1);
+        this.woodTex = tex;
+        if (this.tableMesh) { this.tableMesh.material.map = tex; this.tableMesh.material.needsUpdate = true; }
+      }, undefined, () => { /* keep flat colour */ });
+    } catch (e) { /* texture is cosmetic */ }
   }
 
   _initScene() {
@@ -216,9 +233,12 @@ export class BoardRenderer {
     wall.position.set(0, 10, -2.2); wall.receiveShadow = true;
     this.envGroup.add(wall);
     // table under the wall
-    const table = new THREE.Mesh(new THREE.BoxGeometry(14, 0.5, 4), mat(P.table, 0.7));
+    const tableMat = mat(P.table, 0.7);
+    if (this.woodTex) tableMat.map = this.woodTex;
+    const table = new THREE.Mesh(new THREE.BoxGeometry(14, 0.5, 4), tableMat);
     table.position.set(0, 0.25, 0.8); table.receiveShadow = true; table.castShadow = true;
     this.envGroup.add(table);
+    this.tableMesh = table;
     // two legs
     [-5.5, 5.5].forEach(x => {
       const leg = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.4, 0.5), mat(P.frame, 0.75));
