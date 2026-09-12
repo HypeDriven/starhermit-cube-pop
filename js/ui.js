@@ -528,6 +528,14 @@
       lb.hidden = false;
       $('lesson-title').textContent = opts.lesson.title;
       $('lesson-text').textContent = opts.lesson.text;
+    } else if (!Sess.loadAchievements()['first-pop']) {
+      // First-run rule guidance stays visible until the first successful pop.
+      lb.hidden = false;
+      $('lesson-title').textContent = 'How to play';
+      $('lesson-text').textContent = cfg.intro && /pop/i.test(cfg.intro) ? cfg.intro + ' Bigger groups score more.'
+        : 'Tap a group of two or more touching cubes of the same color to pop it. Bigger groups score more. ' +
+          (cfg.intro || 'Fill every goal to clear the stage.');
+      lb.dataset.firstRun = '1';
     } else lb.hidden = true;
 
     updateHUD();
@@ -645,7 +653,11 @@
     if (sawBomb) award('first-bomb');
     var chainEv = events.filter(function (e) { return e.type === 'chain'; })[0];
     if (chainEv && chainEv.count >= 3) award('chain-3');
-    if (events.some(function (e) { return e.type === 'pop'; })) award('first-pop');
+    if (events.some(function (e) { return e.type === 'pop'; })) {
+      award('first-pop');
+      var lb = $('lesson-box');
+      if (lb && lb.dataset.firstRun) { lb.hidden = true; delete lb.dataset.firstRun; }
+    }
     if (app.session.state.score.bestGroup >= 12) award('big-group');
 
     if (app.renderer) {

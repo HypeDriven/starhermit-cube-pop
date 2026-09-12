@@ -8,7 +8,7 @@ import * as THREE from '../vendor/three.module.min.js';
 
 const SPACING = 1.04;          // cube pitch on the wall
 const CUBE = 0.94;             // cube edge
-const BASE_Y = 0.6;            // height of the wall's bottom row
+const BASE_Y = 1.05;           // height of the wall's bottom row (sits on the table top, never inside it)
 const POP_MS = 160, FALL_MS = 220, BLAST_MS = 260, SHUFFLE_MS = 450;
 
 const QUALITY = {
@@ -512,9 +512,9 @@ export class BoardRenderer {
 
   // ---------- camera ----------
   _layoutCamera() {
-    const w = Math.max(this.cols * SPACING, 6), h = Math.max(this.rows * SPACING + 1.5, 6);
+    const w = Math.max(this.cols * SPACING + 0.6, 5), h = Math.max(this.rows * SPACING + 0.8, 5);
     const aspect = this.container.clientWidth / Math.max(1, this.container.clientHeight);
-    const dist = Math.max(h / (2 * Math.tan(this.camera.fov * Math.PI / 360)), w / (2 * Math.tan(this.camera.fov * Math.PI / 360) * aspect)) + 2.2;
+    const dist = Math.max(h / (2 * Math.tan(this.camera.fov * Math.PI / 360)), w / (2 * Math.tan(this.camera.fov * Math.PI / 360) * aspect)) + 1.2;
     this.camDist = dist;
     this._applyCamera();
   }

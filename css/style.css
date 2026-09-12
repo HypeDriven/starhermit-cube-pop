@@ -224,10 +224,13 @@ body.left-handed #action-tray { flex-direction: row-reverse; }
 /* ---------- landscape mobile: narrow status rail ---------- */
 @media (max-height: 500px) and (orientation: landscape) {
   .screen-game {
-    grid-template-columns: minmax(140px, 180px) 1fr;
+    grid-template-columns: minmax(110px, 140px) 1fr;
     grid-template-rows: 1fr auto;
     grid-template-areas: "left play" "left tray";
   }
+  #rail-left h3 { font-size: 0.9rem; margin: 0 0 4px; }
+  #rail-left { font-size: 0.85rem; }
+  .lesson-box { padding: 6px; font-size: 0.8rem; }
   #rail-right { position: absolute; top: 6px; right: calc(6px + var(--sar)); display: flex; gap: 10px;
     background: #fff8; padding: 4px 8px; border-radius: 10px; margin: 0; z-index: 5; }
   #rail-left { margin: 6px; }
