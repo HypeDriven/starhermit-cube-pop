@@ -200,9 +200,10 @@ Cube Pop is the feeling of sweeping a shelf of toy blocks off a table with one f
 Manifest `starhermit.txt`: `name=Cube Pop`, `launch=index.html`, `owner=<uuid>`, `server=server.js`, `cover=coverart.png` (conventions per https://wiki.starhermit.com/).
 **Used:**
 - **Game script** (`server.js`): same-origin `GET /api/v1/time` (server clock; client computes a round-trip-adjusted offset in `Session.syncTime`, UTC shown in the top bar), `GET /api/v1/daily/board?date=` (top 50 ranked entries), `POST /api/v1/daily/submit` (name ≤ 24 chars, date not in the future, envelope re-simulated from the daily seed: schema 1, content version 1, initial and final hash match, no duplicate ids, legal commands, claimed score equal, elapsed ≥ 100 ms per move; 20 requests per IP per minute; one entry per name per day; days can be flagged `excluded`).
-- **Leaderboard:** daily only, server-validated, casual name entry, `Guest` default.
+- **Leaderboard:** daily only, server-validated. Offline: casual name entry (`Guest` default). Hosted: submissions and board rows use the account nickname from the platform profile (the name field is read-only).
 - **Sessions:** solo and local; the daily is an asynchronous seeded session with a replay envelope (`Session.envelope`: schema, build `1.0.0`, content version, config id, seed, initial hash, ordered commands, periodic hashes every 5 commands, invalid count, assists, result, final hash).
-**Not used:** platform identity or launch tokens, presence heartbeats, cloud save (progress is a checksummed localStorage document shaped for it), platform achievements (local only), friends filtering, realtime rooms, matchmaking, chat, voice. The client is fully offline-capable: when the API is unreachable the top bar shows `offline`, the daily screen shows an offline note and scores are kept locally.
+**Used (hosted):** `js/platform.js` reads `#game_token=<jwt>` from the URL fragment (stripped after the read; query forms for local dev), decodes `sub` + `game_scope` (never hard-coded), sends `Authorization: Bearer` on every call, and re-mints every 45 min via `POST /api/v1/games/{slug}/launch-token` (60 s retry). The top bar shows "Playing as <nickname> · sync status" from `GET /api/v1/users/{sub}/profile` (never usernames, never `/api/v1/me`). The checksummed progress document mirrors to one zip+base64 cloud slot at `GET/PUT /api/v1/me/cloud-saves/{slug}` — remote wins on boot (validated by `CPSession.loadProgressRaw`), saves debounce 2 s and flush on `pagehide`/hidden with keepalive. The own-server validated daily submit/board/time routes keep working as its-backend with graceful fallback, now carrying the account id.
+**Not used:** presence heartbeats, platform achievements (local only), friends filtering, realtime rooms, matchmaking, chat, voice. The client is fully offline-capable: without a token it makes the same local-only calls as before, the top bar shows `offline-capable`, the daily screen shows an offline note and scores are kept locally.
 
 ## 12. Technical architecture
 
@@ -254,6 +255,6 @@ QA bar (agents/qa.md) as checkable statements: (1) a new player sees instruction
 
 - String table and locale selection for the nine required locales (§9).
 - Load `assets/toy-rocket.glb` (vendored GLTFLoader) for the rocket special and a spinning title prop, falling back to the procedural cone rocket.
-- Send achievements and daily results through StarHermit identity once launch tokens are wired; global and friends boards for Score Chase with a seed shared per UTC day.
+- Send achievements through the platform; global and friends boards for Score Chase with a seed shared per UTC day (identity and validated daily submissions are done).
 - Authored music stems per theme in place of the synthesised pentatonic loop.
 - Count the fired special's cell once (with a golden-hash update and content version bump).

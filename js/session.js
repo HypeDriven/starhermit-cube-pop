@@ -43,17 +43,32 @@
   function saveSettings(s) { writeLS(LS.settings, s); }
 
   // ---------- progress (versioned, checksummed cloud-save-shaped doc) ----------
+  function progressChecksum(p) {
+    return checksum({ v: p.v, stars: p.stars, completed: p.completed, dailiesDone: p.dailiesDone, totalCubes: p.totalCubes });
+  }
   function loadProgress() {
     var doc = readLS(LS.progress, null);
     if (!doc || doc.v !== 1) doc = { v: 1, stars: {}, completed: {}, dailiesDone: {}, totalCubes: 0 };
-    if (doc.sum !== checksum({ v: doc.v, stars: doc.stars, completed: doc.completed, dailiesDone: doc.dailiesDone, totalCubes: doc.totalCubes })) {
+    if (doc.sum !== progressChecksum(doc)) {
       doc = { v: 1, stars: {}, completed: {}, dailiesDone: {}, totalCubes: 0 }; // corrupt → reset safely
     }
     return doc;
   }
+  // Validates a progress document (local or from the cloud slot); null when
+  // the shape or checksum fails. Remote-preferred loads go through here.
+  function loadProgressRaw(json) {
+    try {
+      var doc = typeof json === 'string' ? JSON.parse(json) : json;
+      if (!doc || doc.v !== 1) return null;
+      if (doc.sum !== progressChecksum(doc)) return null;
+      return doc;
+    } catch (e) { return null; }
+  }
   function saveProgress(p) {
-    p.sum = checksum({ v: p.v, stars: p.stars, completed: p.completed, dailiesDone: p.dailiesDone, totalCubes: p.totalCubes });
+    p.sum = progressChecksum(p);
     writeLS(LS.progress, p);
+    if (root.CPPlatform && typeof root.CPPlatform.onProgressSave === 'function')
+      root.CPPlatform.onProgressSave(JSON.stringify(p)); // mirror to the cloud slot
   }
   function totalStars(p) {
     var n = 0; for (var k in p.stars) n += p.stars[k];
@@ -74,7 +89,7 @@
   var timeOffset = 0; // serverNow - clientNow
   function syncTime() {
     var t0 = Date.now();
-    return fetch('/api/v1/time').then(function (r) {
+    return fetch('/api/v1/time', { headers: apiHeaders() }).then(function (r) {
       if (!r.ok) throw new Error('time ' + r.status);
       return r.json();
     }).then(function (body) {
@@ -240,11 +255,20 @@
     } catch (e) { return null; }
   };
 
-  // ---------- daily leaderboard ----------
+  // ---------- daily leaderboard (own-server validated routes) ----------
+  function apiHeaders(extra) {
+    var h = extra || {};
+    if (root.CPPlatform && typeof root.CPPlatform.headers === 'function')
+      return root.CPPlatform.headers(h);
+    return h;
+  }
   function submitDaily(name, date, envelope) {
     return fetch('/api/v1/daily/submit', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name, date: date, envelope: envelope })
+      method: 'POST', headers: apiHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        name: name, date: date, envelope: envelope,
+        playerId: root.CPPlatform && root.CPPlatform.hosted ? root.CPPlatform.userId : undefined
+      })
     }).then(function (r) {
       return r.json().then(function (body) {
         if (!r.ok) throw new Error(body.error || ('http ' + r.status));
@@ -253,7 +277,7 @@
     });
   }
   function dailyBoard(date) {
-    return fetch('/api/v1/daily/board?date=' + encodeURIComponent(date))
+    return fetch('/api/v1/daily/board?date=' + encodeURIComponent(date), { headers: apiHeaders() })
       .then(function (r) { return r.json(); });
   }
 
@@ -261,7 +285,8 @@
     BUILD: BUILD,
     Session: Session,
     loadSettings: loadSettings, saveSettings: saveSettings,
-    loadProgress: loadProgress, saveProgress: saveProgress, totalStars: totalStars,
+    loadProgress: loadProgress, loadProgressRaw: loadProgressRaw,
+    saveProgress: saveProgress, totalStars: totalStars,
     loadAchievements: loadAchievements, unlockAchievement: unlockAchievement,
     syncTime: syncTime, now: now, todayUtc: todayUtc,
     submitDaily: submitDaily, dailyBoard: dailyBoard,

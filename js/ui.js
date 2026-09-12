@@ -262,20 +262,42 @@
     $('btn-daily-play').onclick = function () { app.currentList = 'daily'; app.currentIdx = 0; startRound(cfg); };
   }
 
+  // Account + cloud-sync status in the top bar. Offline keeps the local-only
+  // behaviour; hosted shows the account nickname and sync state.
+  function renderNetStatus() {
+    var el = $('status-net'), Platform = root.CPPlatform;
+    if (!el || !Platform) return;
+    if (!Platform.hosted) {
+      el.className = 'net-off';
+      el.textContent = 'offline-capable';
+      return;
+    }
+    el.className = 'net-ok';
+    var name = Platform.profile ? Platform.profile.name : '…';
+    el.textContent = 'Playing as ' + name + ' · ' +
+      (Platform.sync === 'synced' ? 'progress synced'
+        : Platform.sync === 'saving' ? 'saving…'
+        : 'cloud sync pending');
+  }
+
   function refreshDailyBoard(date) {
     var ol = $('daily-board');
     ol.innerHTML = '';
     Sess.dailyBoard(date).then(function (body) {
-      $('status-net').className = 'net-ok';
-      $('status-net').textContent = 'online';
+      if (!root.CPPlatform || !root.CPPlatform.hosted) {
+        $('status-net').className = 'net-ok';
+        $('status-net').textContent = 'online';
+      }
       (body.entries || []).forEach(function (e2) {
         ol.appendChild(el('li', '', esc(e2.name) + ' — ' + e2.score + ' pts (' + e2.moves + ' moves' +
           (e2.won ? ', goals complete' : '') + ')'));
       });
       if (!ol.children.length) ol.appendChild(el('li', '', 'No validated scores yet today.'));
     }).catch(function () {
-      $('status-net').className = 'net-off';
-      $('status-net').textContent = 'offline';
+      if (!root.CPPlatform || !root.CPPlatform.hosted) {
+        $('status-net').className = 'net-off';
+        $('status-net').textContent = 'offline';
+      }
       $('daily-note').textContent = 'Offline: today\'s board is unavailable; your run is still recorded locally.';
     });
   }
@@ -752,8 +774,11 @@
   }
 
   function submitDailyScore() {
-    var name = $('daily-name').value.trim() || 'Guest';
-    Sess.writeLS('cubepop:name', name);
+    var Platform = root.CPPlatform;
+    var name = (Platform && Platform.hosted && Platform.profile)
+      ? Platform.profile.name
+      : ($('daily-name').value.trim() || 'Guest');
+    if (!(Platform && Platform.hosted)) Sess.writeLS('cubepop:name', name);
     var st = app.session.state;
     $('daily-submit-status').textContent = 'Validating with server…';
     $('btn-daily-submit').disabled = true;
@@ -1117,6 +1142,34 @@
     app.createRenderer = deps.createRenderer;
     app.settings = Sess.loadSettings();
     app.progress = Sess.loadProgress();
+
+    // Platform handshake: token read, remote save wins, account nickname.
+    var Platform = root.CPPlatform;
+    if (Platform) {
+      try { Platform.init(); } catch (e) { /* offline */ }
+      if (Platform.hosted) {
+        try { Platform.onSync(renderNetStatus); } catch (e) { /* ok */ }
+        Platform.fetchProfile().then(function () {
+          renderNetStatus();
+          // The account nickname replaces the free-text name on submissions.
+          var nameInput = $('daily-name');
+          if (nameInput && Platform.profile) {
+            nameInput.value = Platform.profile.name;
+            nameInput.disabled = true;
+          }
+        }).catch(function () {});
+        Platform.loadCloud().then(function (remoteJson) {
+          var remote = Sess.loadProgressRaw(remoteJson);
+          if (remote) {
+            app.progress = remote;
+            Sess.saveProgress(remote); // local cache mirrors the remote doc
+            refreshTitle();
+          }
+          renderNetStatus();
+        }).catch(function () {});
+      }
+      renderNetStatus();
+    }
     Audio.setCaptionCallback(function (text) {
       if (!app.settings.captions) return;
       var c = $('captions');
