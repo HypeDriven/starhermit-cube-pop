@@ -1,36 +1,136 @@
 /* Cube Pop — Three.js renderer (ES module).
  * Cheerful toy studio: a wall of soft-edged cubes on a wooden table.
  * Instanced cubes per color, pooled particles, authored fixed camera with
- * drag-orbit, tiered quality, deterministic layout (visual seed only
+ * drag-orbit, graphics presets (js/gfx.js) with an optional post chain,
+ * deterministic layout (visual seed only
  * decorates the studio, never the board).
  */
-import * as THREE from '../vendor/three.module.min.js';
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const Gfx = window.CPGfx;
 
 const SPACING = 1.04;          // cube pitch on the wall
 const CUBE = 0.94;             // cube edge
 const BASE_Y = 1.05;           // height of the wall's bottom row (sits on the table top, never inside it)
 const POP_MS = 160, FALL_MS = 220, BLAST_MS = 260, SHUFFLE_MS = 450;
 
-const QUALITY = {
-  high:   { dpr: 2,   shadows: true,  particles: 160, envDetail: 1 },
-  medium: { dpr: 1.5, shadows: true,  particles: 80,  envDetail: 1 },
-  low:    { dpr: 1,   shadows: false, particles: 30,  envDetail: 0 }
+const MOTE_COUNT = 70;         // ambient dust motes drifting in the key light
+
+// Colour grade + vignette (display-space colours in, display-space out):
+// gentle S-curve, a touch more saturation, warm highlights / cool shadows.
+const GradeShader = {
+  uniforms: { tDiffuse: { value: null }, uAmount: { value: 1.0 }, uVignette: { value: 0.2 } },
+  vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float uAmount; uniform float uVignette;
+    varying vec2 vUv;
+    void main() {
+      vec4 src = texture2D(tDiffuse, vUv);
+      vec3 c = clamp(src.rgb, 0.0, 1.0);
+      vec3 s = mix(c, c * c * (3.0 - 2.0 * c), 0.18);
+      float l = dot(s, vec3(0.299, 0.587, 0.114));
+      s = mix(vec3(l), s, 1.1);
+      s *= mix(vec3(0.97, 0.98, 1.03), vec3(1.03, 1.0, 0.96), smoothstep(0.2, 0.8, l));
+      c = mix(c, s, uAmount);
+      float d = length((vUv - 0.5) * vec2(1.0, 0.85));
+      c *= 1.0 - uVignette * smoothstep(0.38, 0.9, d);
+      gl_FragColor = vec4(c, src.a);
+    }`
 };
+
+// Soft round sprite for particles and motes (procedural, authored once).
+function dotTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grd.addColorStop(0, 'rgba(255,255,255,1)');
+  grd.addColorStop(0.45, 'rgba(255,255,255,0.9)');
+  grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// Low-contrast wallpaper: soft vertical stripes and a scatter of tiny dots,
+// tinted from the theme's wall colour so every theme keeps its mood.
+function wallpaperTexture(wallHex) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const base = new THREE.Color(wallHex);
+  const css = (col) => '#' + col.getHexString();
+  g.fillStyle = css(base);
+  g.fillRect(0, 0, 256, 256);
+  g.fillStyle = css(base.clone().multiplyScalar(0.94));
+  for (let x = 0; x < 256; x += 64) g.fillRect(x, 0, 26, 256);
+  g.fillStyle = css(base.clone().lerp(new THREE.Color(0xffffff), 0.25));
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 60; i++) {
+    g.beginPath();
+    g.arc(45 + Math.floor(rnd() * 4) * 64 + (rnd() - 0.5) * 8, rnd() * 256, 1.6, 0, Math.PI * 2);
+    g.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(10, 5);
+  t.anisotropy = 4;
+  return t;
+}
+
+// Floorboards: plank seams with a little per-plank value noise.
+function floorTexture(floorHex) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const base = new THREE.Color(floorHex);
+  let seed = 11;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 8; i++) {
+    g.fillStyle = '#' + base.clone().multiplyScalar(0.93 + rnd() * 0.12).getHexString();
+    g.fillRect(0, i * 32, 256, 32);
+    g.fillStyle = '#' + base.clone().multiplyScalar(0.8).getHexString();
+    g.fillRect(0, i * 32, 256, 2);
+    g.fillRect(Math.floor(rnd() * 256), i * 32, 2, 32);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(8, 8);
+  t.anisotropy = 4;
+  return t;
+}
 
 function hex(n) { return new THREE.Color(n); }
 
 // Soft-edged cube: rounded-square extrude with bevel (procedural, authored).
-function roundedCubeGeo(size) {
-  const r = size * 0.18, h = size / 2 - r;
+// The bevel grows the outline, so the shape is inset by it and the finished
+// cube measures exactly `size` (neighbours on the wall never interpenetrate).
+function roundedCubeGeo(size, detailed) {
+  const b = size * 0.1, r = size * 0.1, h = size / 2 - b - r;
   const s = new THREE.Shape();
-  s.moveTo(-h - r, -h);
+  s.moveTo(-h, -h - r);
   s.lineTo(h, -h - r); s.absarc(h, -h, r, -Math.PI / 2, 0);
   s.lineTo(h + r, h); s.absarc(h, h, r, 0, Math.PI / 2);
   s.lineTo(-h, h + r); s.absarc(-h, h, r, Math.PI / 2, Math.PI);
   s.lineTo(-h - r, -h); s.absarc(-h, -h, r, Math.PI, Math.PI * 1.5);
   const g = new THREE.ExtrudeGeometry(s, {
-    depth: size - 2 * r * 0.6, bevelEnabled: true,
-    bevelThickness: r * 0.6, bevelSize: r * 0.6, bevelSegments: 2, curveSegments: 5
+    depth: size - 2 * b, bevelEnabled: true,
+    bevelThickness: b, bevelSize: b,
+    bevelSegments: detailed ? 4 : 2, curveSegments: detailed ? 8 : 5
   });
   g.center();
   return g;
@@ -69,7 +169,19 @@ export class BoardRenderer {
     this.onPick = opts.onPick || function () {};
     this.onHover = opts.onHover || function () {};
     this.reducedMotion = false;
-    this.tier = 'high';
+    this.gpu = this.opts.gpu || '';
+    this.detected = this.opts.detected || 'balanced';
+    this.q = Gfx.resolve(this.opts.graphics || {}, this.detected);
+    this.size = [0, 0];
+    this.pixelRatio = 1;
+    this.adaptiveScale = 1;
+    this._frames = [];
+    this.fps = 0;
+    this.postKey = null;
+    this.composer = null;
+    this.postFailed = false;
+    this.clock = 0;              // ambient animation time (frozen under reduced motion)
+    this._prm = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
     this.entities = [];          // {key,color,special,x,y,z,scale,tx,ty,tz,tscale,specialMesh?}
     this.entityByCell = {};
     this.rows = 0; this.cols = 0;
@@ -83,8 +195,10 @@ export class BoardRenderer {
     this._initGL();
     this._initScene();
     this._initParticles();
+    this._initMotes();
     this._initInput();
     this._loadWoodTexture();
+    this._applyGraphics();
     this._loop = this._loop.bind(this);
     this._last = performance.now();
     requestAnimationFrame(this._loop);
@@ -95,14 +209,27 @@ export class BoardRenderer {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.enabled = false;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.domElement.dataset.gfxPreset = this.q.preset;
     this.container.appendChild(this.renderer.domElement);
     this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
     this.scene = new THREE.Scene();
     this._onResize = this._resize.bind(this);
     window.addEventListener('resize', this._onResize);
     this._resize();
+  }
+
+  // Image-based lighting from a neutral studio room (built once, on demand).
+  _envMap() {
+    if (!this._envTex) {
+      const pmrem = new THREE.PMREMGenerator(this.renderer);
+      const room = new RoomEnvironment(this.renderer);
+      this._envTex = pmrem.fromScene(room, 0.04).texture;
+      room.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+      pmrem.dispose();
+    }
+    return this._envTex;
   }
 
   // Authored wood grain for the table top (assets/table-wood.webp). Loads
@@ -126,14 +253,22 @@ export class BoardRenderer {
     this.scene.add(this.world);
     this.keyLight = new THREE.DirectionalLight(0xfff1d6, 2.2);
     this.keyLight.position.set(4, 8, 6);
-    this.keyLight.castShadow = true;
+    this.keyLight.castShadow = false;
     this.keyLight.shadow.mapSize.set(1024, 1024);
-    this.keyLight.shadow.camera.left = -7; this.keyLight.shadow.camera.right = 7;
-    this.keyLight.shadow.camera.top = 9; this.keyLight.shadow.camera.bottom = -2;
+    this.keyLight.shadow.bias = -0.0004;
+    this.keyLight.shadow.normalBias = 0.02;
+    this.keyLight.shadow.radius = 3;
+    this.keyDir = new THREE.Vector3(4, 8, 6).normalize();
     this.scene.add(this.keyLight);
+    this.scene.add(this.keyLight.target);
     this.fillLight = new THREE.HemisphereLight(0xffffff, 0x8a6a4a, 0.9);
     this.scene.add(this.fillLight);
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+    this.ambient = new THREE.AmbientLight(0xffffff, 0.25);
+    this.scene.add(this.ambient);
+    // cool rim from the left so cube bevels read against the wall
+    this.rimLight = new THREE.DirectionalLight(0xcfe0ff, 0.0);
+    this.rimLight.position.set(-6, 4, 3);
+    this.scene.add(this.rimLight);
 
     // environment group (rebuilt per theme)
     this.envGroup = new THREE.Group();
@@ -153,7 +288,8 @@ export class BoardRenderer {
 
     // outline markers pool for group preview + focus ring
     this.markers = [];
-    const mGeo = new THREE.BoxGeometry(CUBE * 1.02, CUBE * 1.02, 0.06);
+    // Outline markers sit just behind the cube face and a little wider, so they read as a rim.
+    const mGeo = new THREE.BoxGeometry(CUBE * 1.09, CUBE * 1.09, 0.06);
     for (let i = 0; i < 80; i++) {
       const m = new THREE.Mesh(mGeo, new THREE.MeshBasicMaterial({
         color: 0xffffff, transparent: true, opacity: 0.0, depthWrite: false }));
@@ -179,7 +315,10 @@ export class BoardRenderer {
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
     this.pGeo = g;
-    const m = new THREE.PointsMaterial({ size: 0.09, vertexColors: true, transparent: true, opacity: 0.95 });
+    this._dotTex = dotTexture();
+    const m = new THREE.PointsMaterial({ size: 0.09, vertexColors: true, transparent: true, opacity: 0.95,
+      depthWrite: false });
+    this.pMat = m;
     this.points = new THREE.Points(g, m);
     this.points.frustumCulled = false;
     this.points.raycast = function () {}; // cosmetic: never intercepts picking
@@ -187,15 +326,50 @@ export class BoardRenderer {
     for (let i = 0; i < cap; i++) { pos[i * 3 + 1] = -100; }
   }
 
+  // Ambient dust motes drifting slowly through the key light (background: animated).
+  _initMotes() {
+    const pos = new Float32Array(MOTE_COUNT * 3);
+    this.moteSeed = [];
+    for (let i = 0; i < MOTE_COUNT; i++) {
+      const a = Math.sin(i * 12.9898) * 43758.5453, b = Math.sin(i * 78.233) * 12543.123, c = Math.sin(i * 39.425) * 24634.634;
+      this.moteSeed.push([a - Math.floor(a), b - Math.floor(b), c - Math.floor(c)]);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    this.moteGeo = g;
+    this.motes = new THREE.Points(g, new THREE.PointsMaterial({
+      size: 0.07, map: this._dotTex, color: 0xfff1d0, transparent: true, opacity: 0.45, depthWrite: false }));
+    this.motes.frustumCulled = false;
+    this.motes.raycast = function () {};
+    this.motes.visible = false;
+    this.world.add(this.motes);
+    this._updateMotes(0);
+  }
+  _updateMotes(t) {
+    const pos = this.moteGeo.attributes.position.array;
+    const w = Math.max(this.cols * SPACING + 3, 8), top = BASE_Y + Math.max(this.rows, 6) * SPACING + 1;
+    for (let i = 0; i < MOTE_COUNT; i++) {
+      const [a, b, c] = this.moteSeed[i];
+      const y = ((b * top + t * (0.08 + a * 0.08)) % top);
+      pos[i * 3] = (a - 0.5) * w + Math.sin(t * 0.3 + i) * 0.25;
+      pos[i * 3 + 1] = y + 0.3;
+      pos[i * 3 + 2] = -1.6 + c * 4.2;
+    }
+    this.moteGeo.attributes.position.needsUpdate = true;
+  }
+
   spawnBurst(x, y, z, colorHex, count) {
-    const n = Math.min(count, QUALITY[this.tier].particles);
+    const high = this.q.particles === 'high';
+    const n = Math.min(high ? Math.ceil(count * 1.5) : count, Gfx.PARTICLES[this.q.particles]);
     const c = hex(colorHex);
     const pos = this.pGeo.attributes.position.array;
     const col = this.pGeo.attributes.color.array;
     for (let k = 0; k < n; k++) {
       const i = this.pHead = (this.pHead + 1) % this.pCap;
       pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
-      col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+      // High: every fifth particle is an over-bright sparkle that the bloom pass catches.
+      const glow = high && k % 5 === 0 ? 2.6 : 1;
+      col[i * 3] = glow > 1 ? glow : c.r; col[i * 3 + 1] = glow > 1 ? glow * 0.95 : c.g; col[i * 3 + 2] = glow > 1 ? glow * 0.8 : c.b;
       const a = Math.random() * Math.PI * 2, e = Math.random() * Math.PI - Math.PI / 2;
       const sp = 1.5 + Math.random() * 2.5;
       this.pVel[i * 3] = Math.cos(a) * Math.cos(e) * sp;
@@ -220,18 +394,33 @@ export class BoardRenderer {
       const ch = this.envGroup.children.pop();
       this.envGroup.remove(ch);
       if (ch.geometry) ch.geometry.dispose();
-      if (ch.material) ch.material.dispose();
+      if (ch.material) {
+        if (ch.material.map && ch.material.map !== this.woodTex) ch.material.map.dispose();
+        ch.material.dispose();
+      }
     }
     const P = palette;
-    const mat = (c, rough) => new THREE.MeshStandardMaterial({ color: c, roughness: rough == null ? 0.8 : rough, metalness: 0.05 });
+    const detailed = this.q.detail === 'detailed';
+    const mat = (c, rough) => new THREE.MeshStandardMaterial({ color: c, roughness: rough == null ? 0.8 : rough,
+      metalness: 0.05, envMapIntensity: 0.2 });
     // floor
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), mat(P.floor, 0.9));
+    const floorMat = mat(detailed ? 0xffffff : P.floor, 0.9);
+    if (detailed) floorMat.map = floorTexture(P.floor);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), floorMat);
     floor.rotation.x = -Math.PI / 2; floor.position.y = -0.02; floor.receiveShadow = true;
     this.envGroup.add(floor);
     // back wall
-    const wall = new THREE.Mesh(new THREE.PlaneGeometry(60, 30), mat(P.wall, 0.95));
+    const wallMat = mat(detailed ? 0xffffff : P.wall, 0.95);
+    if (detailed) wallMat.map = wallpaperTexture(P.wall);
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(60, 30), wallMat);
     wall.position.set(0, 10, -2.2); wall.receiveShadow = true;
     this.envGroup.add(wall);
+    if (detailed) {
+      // skirting board where wall meets floor
+      const skirt = new THREE.Mesh(new THREE.BoxGeometry(60, 0.5, 0.12), mat(P.frame, 0.6));
+      skirt.position.set(0, 0.23, -2.14); skirt.receiveShadow = true;
+      this.envGroup.add(skirt);
+    }
     // table under the wall
     const tableMat = mat(P.table, 0.7);
     if (this.woodTex) tableMat.map = this.woodTex;
@@ -245,7 +434,7 @@ export class BoardRenderer {
       leg.position.set(x, -0.45, 0.8);
       this.envGroup.add(leg);
     });
-    if (QUALITY[this.tier].envDetail) {
+    if (detailed) {
       // shelf + toy props (deterministic decor, seeded by theme palette)
       const shelf = new THREE.Mesh(new THREE.BoxGeometry(20, 0.3, 1.2), mat(P.frame, 0.8));
       shelf.position.set(0, 7.6, -1.9);
@@ -260,18 +449,173 @@ export class BoardRenderer {
         prop.castShadow = true;
         this.envGroup.add(prop);
       }
+      // a little stack of toy blocks and a ring toy between the props
+      const blockCols = [P.accent, 0xf2c14e, 0x5b8fd4];
+      for (let i = 0; i < 3; i++) {
+        const b = new THREE.Mesh(roundedCubeGeo(0.42, true), new THREE.MeshPhysicalMaterial({
+          color: blockCols[i], roughness: 0.45, clearcoat: 0.5, clearcoatRoughness: 0.3, envMapIntensity: 0.25 }));
+        b.position.set(-3.2 + (i === 2 ? 0.22 : i * 0.46), 7.97 + (i === 2 ? 0.43 : 0), -1.9);
+        b.rotation.y = (i - 1) * 0.25;
+        b.castShadow = true;
+        this.envGroup.add(b);
+      }
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.09, 10, 24), new THREE.MeshPhysicalMaterial({
+        color: 0x8fd48f, roughness: 0.4, clearcoat: 0.5, envMapIntensity: 0.25 }));
+      ring.position.set(3.4, 8.1, -1.9); ring.rotation.x = -Math.PI / 2 + 0.25;
+      ring.castShadow = true;
+      this.envGroup.add(ring);
     }
     this._rebuildBoardMeshes();
   }
 
-  setQuality(tier) {
-    if (!QUALITY[tier]) tier = 'high';
-    this.tier = tier;
-    const q = QUALITY[tier];
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.dpr));
-    this.renderer.shadowMap.enabled = q.shadows;
-    this.keyLight.castShadow = q.shadows;
-    if (this.palette) this.setTheme(this.palette, this._colorDefs || [], this._hc);
+  // ---------- graphics settings ----------
+  /** Apply saved graphics settings ({preset, render_scale, adaptive, show_fps, <category>}). */
+  setGraphics(saved, detected, gpu) {
+    if (detected) this.detected = detected;
+    if (gpu) this.gpu = gpu;
+    const key = JSON.stringify(saved || {}) + '|' + this.detected;
+    if (key === this._gfxKey) return; // unrelated settings changed
+    this._gfxKey = key;
+    const before = this.q;
+    this.q = Gfx.resolve(saved || {}, this.detected);
+    this._applyGraphics();
+    if (this.palette && (before.detail !== this.q.detail)) {
+      this.setTheme(this.palette, this._colorDefs || [], this._hc);
+    }
+  }
+
+  _applyGraphics() {
+    const g = this.q;
+    const size = Gfx.SHADOW_MAP[g.shadows];
+    const wasShadow = this.renderer.shadowMap.enabled;
+    this.renderer.shadowMap.enabled = size > 0;
+    this.keyLight.castShadow = size > 0;
+    if (size > 0 && this.keyLight.shadow.mapSize.x !== size) {
+      this.keyLight.shadow.mapSize.set(size, size);
+      if (this.keyLight.shadow.map) { this.keyLight.shadow.map.dispose(); this.keyLight.shadow.map = null; }
+    }
+    // Image-based lighting replaces most of the flat fill when reflections are on.
+    const ibl = g.reflections === 'on';
+    this.scene.environment = ibl ? this._envMap() : null;
+    this.fillLight.intensity = ibl ? 0.7 : 0.9;
+    this.ambient.intensity = ibl ? 0.1 : 0.25;
+    this.rimLight.intensity = g.detail === 'detailed' ? 0.6 : 0;
+    this.motes.visible = g.background === 'animated';
+    // High particles: larger soft round confetti; Low keeps the original cheap squares.
+    this.pMat.map = g.particles === 'high' ? this._dotTex : null;
+    this.pMat.size = g.particles === 'high' ? 0.16 : 0.09;
+    this.pMat.needsUpdate = true;
+    this.renderer.domElement.dataset.gfxPreset = g.preset;
+    this.adaptiveScale = 1;
+    this._frames = [];
+    this.postKey = null; // rebuild the post chain on the next frame
+    this.postFailed = false;
+    this._fpsVisible(g.showFps);
+    if (wasShadow !== this.renderer.shadowMap.enabled) {
+      this.scene.traverse(o => {
+        if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.needsUpdate = true; });
+      });
+    }
+  }
+
+  /** What the settings panel shows: GPU, auto choice, resolved tiers, cost and frame rate. */
+  graphicsInfo() {
+    const px = [Math.round(this.size[0] * this.pixelRatio), Math.round(this.size[1] * this.pixelRatio)];
+    return {
+      gpu: this.gpu || '', detected: this.detected, resolved: this.q,
+      summary: Gfx.describe(this.q, px), pixels: px,
+      fps: Math.round(this.fps || 0), adaptiveScale: Math.round(this.adaptiveScale * 100) / 100,
+      postFailed: !!this.postFailed
+    };
+  }
+
+  _fpsVisible(on) {
+    let el = document.getElementById('fps-meter');
+    if (on && !el) {
+      el = document.createElement('div');
+      el.id = 'fps-meter';
+      el.setAttribute('aria-hidden', 'true');
+      el.textContent = '… fps';
+      document.body.appendChild(el);
+    }
+    if (el) el.hidden = !on;
+  }
+
+  _postKey(w, h) {
+    const g = this.q;
+    return g.post && !this.postFailed ? [g.ao, g.bloom, g.grade, g.antialias, w, h, this.pixelRatio].join('|') : 'none';
+  }
+
+  _buildPost(w, h) {
+    const g = this.q;
+    if (this.composer) { this.composer.dispose(); this.composer = null; }
+    if (!g.post || this.postFailed) return;
+    try {
+      const pw = Math.max(1, Math.round(w * this.pixelRatio)), ph = Math.max(1, Math.round(h * this.pixelRatio));
+      const target = new THREE.WebGLRenderTarget(pw, ph, {
+        type: THREE.HalfFloatType, samples: g.antialias === 'msaa' ? 4 : 0 });
+      const composer = new EffectComposer(this.renderer, target);
+      composer.setPixelRatio(this.pixelRatio);
+      composer.setSize(w, h);
+      composer.addPass(new RenderPass(this.scene, this.camera));
+      if (g.ao !== 'off') {
+        const hi = g.ao === 'high';
+        const ao = new GTAOPass(this.scene, this.camera, pw, ph);
+        ao.output = GTAOPass.OUTPUT.Default;
+        ao.blendIntensity = 0.85;
+        ao.updateGtaoMaterial({ radius: 0.45, distanceExponent: 1.2, thickness: 1.0, scale: 1.0, samples: hi ? 16 : 8 });
+        ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: hi ? 6 : 4, rings: 2, samples: hi ? 16 : 8 });
+        composer.addPass(ao);
+      }
+      // High threshold: only fuse sparks, sparkles and hot highlights bloom.
+      if (g.bloom === 'on') composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.45, 0.4, 0.9));
+      if (g.grade === 'on') composer.addPass(new ShaderPass(GradeShader));
+      composer.addPass(new OutputPass());
+      if (g.antialias === 'smaa') composer.addPass(new SMAAPass(pw, ph));
+      if (g.antialias === 'fxaa') {
+        const fxaa = new ShaderPass(FXAAShader);
+        fxaa.material.uniforms.resolution.value.set(1 / pw, 1 / ph);
+        composer.addPass(fxaa);
+      }
+      this.composer = composer;
+    } catch (e) {
+      // Post-processing is an enhancement: render directly and let the panel say so.
+      this.postFailed = true;
+      this.composer = null;
+    }
+  }
+
+  // Adaptive resolution: step the render scale down when frames are slow, back up when fast.
+  _adapt(dtMs) {
+    const f = this._frames;
+    f.push(dtMs);
+    if (f.length < 90) return false;
+    const avg = f.reduce((a, b) => a + b, 0) / f.length;
+    f.length = 0;
+    this.fps = 1000 / avg;
+    const el = document.getElementById('fps-meter');
+    if (el && !el.hidden) el.textContent = Math.round(this.fps) + ' fps · ' + (Math.round(this.pixelRatio * 100) / 100) + '×';
+    if (!this.q.adaptive) return false;
+    const before = this.adaptiveScale;
+    if (avg > 26) this.adaptiveScale = Math.max(0.6, this.adaptiveScale - 0.1);
+    else if (avg < 14 && this.adaptiveScale < 1) this.adaptiveScale = Math.min(1, this.adaptiveScale + 0.05);
+    return before !== this.adaptiveScale;
+  }
+
+  // Shadow frustum fitted tightly around the wall, the table top and the
+  // strip of back wall its shadow lands on.
+  _fitShadow() {
+    const w = Math.max(this.cols, 4) * SPACING / 2 + 1.2;
+    const top = BASE_Y + Math.max(this.rows, 4) * SPACING + 0.6;
+    const center = new THREE.Vector3(0, top / 2, 0.2);
+    const radius = Math.hypot(w, top / 2, 2.6);
+    const cam = this.keyLight.shadow.camera;
+    cam.left = -radius; cam.right = radius; cam.top = radius; cam.bottom = -radius;
+    cam.near = 0.5; cam.far = 20 + radius * 2;
+    cam.updateProjectionMatrix();
+    this.keyLight.target.position.copy(center);
+    this.keyLight.position.copy(center).addScaledVector(this.keyDir, 20);
+    this.keyLight.target.updateMatrixWorld();
   }
 
   setReducedMotion(on) { this.reducedMotion = on; }
@@ -293,18 +637,24 @@ export class BoardRenderer {
     this.cubeMeshes = []; this.charmMeshes = [];
     if (!this.rows) return;
     const cap = this.rows * this.cols;
-    const cubeGeo = roundedCubeGeo(CUBE);
+    const detailed = this.q.detail === 'detailed';
+    const cubeGeo = roundedCubeGeo(CUBE, detailed);
     this._cubeGeo = cubeGeo;
     for (let i = 0; i < this.colors.length; i++) {
-      const m = new THREE.InstancedMesh(cubeGeo,
-        new THREE.MeshStandardMaterial({ color: this.colors[i], roughness: 0.55, metalness: 0.05 }), cap);
+      // Detailed: soft-touch toy plastic with a thin clearcoat that catches the room light.
+      const cubeMat = detailed
+        ? new THREE.MeshPhysicalMaterial({ color: this.colors[i], roughness: 0.5, metalness: 0,
+          clearcoat: 0.4, clearcoatRoughness: 0.18, envMapIntensity: 0.22 })
+        : new THREE.MeshStandardMaterial({ color: this.colors[i], roughness: 0.55, metalness: 0.05, envMapIntensity: 0.25 });
+      const m = new THREE.InstancedMesh(cubeGeo, cubeMat, cap);
       m.castShadow = true; m.receiveShadow = true;
       m.count = 0;
       m.raycast = function () {};  // picking uses the plane, not the cubes
       this.boardGroup.add(m);
       this.cubeMeshes.push(m);
       const cm = new THREE.InstancedMesh(charmGeo(i),
-        new THREE.MeshStandardMaterial({ color: 0xfff6e8, roughness: 0.4, metalness: 0.1 }), cap);
+        new THREE.MeshStandardMaterial({ color: 0xfff6e8, roughness: 0.35, metalness: 0.1, envMapIntensity: 0.3 }), cap);
+      cm.castShadow = detailed;
       cm.count = 0;
       cm.raycast = function () {};
       this.boardGroup.add(cm);
@@ -336,23 +686,31 @@ export class BoardRenderer {
         this.entityByCell[e.key] = e;
       }
     this._layoutCamera();
+    this._fitShadow();
     this._updateMarkers();
   }
 
   _makeSpecialMesh(s, colorIdx, p) {
     const g = new THREE.Group();
-    const base = new THREE.Mesh(roundedCubeGeo(CUBE * 0.9),
-      new THREE.MeshStandardMaterial({ color: this.colors[colorIdx], roughness: 0.4, metalness: 0.15 }));
+    const base = new THREE.Mesh(roundedCubeGeo(CUBE * 0.9, this.q.detail === 'detailed'),
+      new THREE.MeshPhysicalMaterial({ color: this.colors[colorIdx], roughness: 0.4, metalness: 0.1,
+        clearcoat: this.q.detail === 'detailed' ? 0.5 : 0, clearcoatRoughness: 0.2, envMapIntensity: 0.25 }));
     base.castShadow = true;
     g.add(base);
     let top;
-    const dark = new THREE.MeshStandardMaterial({ color: 0x4a4038, roughness: 0.5 });
-    if (s === 3) { // bomb: sphere + fuse
-      top = new THREE.Mesh(new THREE.SphereGeometry(0.34, 14, 10), dark);
+    const dark = new THREE.MeshPhysicalMaterial({ color: 0x4a4038, roughness: 0.35, clearcoat: 0.6, clearcoatRoughness: 0.2, envMapIntensity: 0.4 });
+    if (s === 3) { // bomb: sphere + fuse with a glowing spark (bloom catches it)
+      top = new THREE.Mesh(new THREE.SphereGeometry(0.34, 18, 12), dark);
       const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.22, 6),
         new THREE.MeshStandardMaterial({ color: 0xffd76a, emissive: 0x664400 }));
       fuse.position.y = 0.42;
       g.add(fuse);
+      const spark = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(3.0, 2.2, 0.9) }));
+      spark.position.set(0, 0.55, CUBE / 2 + 0.1);
+      spark.userData.spark = true;
+      g.add(spark);
+      g.userData.spark = spark;
     } else { // rocket: cone on stick; H rockets lie flat, V rockets stand
       top = new THREE.Group();
       const body = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 10),
@@ -368,6 +726,8 @@ export class BoardRenderer {
     if (s !== 3) top.position.y = 0;
     g.add(top);
     g.position.set(p.x, p.y, p.z);
+    g.userData.top = top;
+    g.userData.phase = (p.x * 1.7 + p.y * 0.9) % (Math.PI * 2);
     this.boardGroup.add(g);
     return g;
   }
@@ -490,7 +850,7 @@ export class BoardRenderer {
       if (mi >= this.markers.length) return;
       const m = this.markers[mi++];
       m.visible = true;
-      m.position.set(x, y, CUBE / 2 + 0.03);
+      m.position.set(x, y, CUBE / 2 - 0.05);
       m.material.color.set(color);
       m.material.opacity = opacity;
     };
@@ -538,9 +898,26 @@ export class BoardRenderer {
     if (!w || !h) return;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(w, h);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY[this.tier].dpr));
+    this._syncSize(w, h, true);
     this._layoutCamera();
+  }
+
+  // Pixel ratio = min(dpr, preset cap) × preset/user scale × adaptive scale.
+  _syncSize(w, h, force) {
+    const g = this.q;
+    const ratio = Math.min(window.devicePixelRatio || 1, g.dprCap) * g.scale * this.adaptiveScale;
+    if (force || w !== this.size[0] || h !== this.size[1] || ratio !== this.pixelRatio) {
+      const resized = w !== this.size[0] || h !== this.size[1];
+      this.size = [w, h];
+      this.pixelRatio = ratio;
+      this.renderer.setPixelRatio(ratio);
+      this.renderer.setSize(w, h);
+      if (resized) {
+        this.camera.aspect = w / h;
+        this.camera.updateProjectionMatrix();
+        if (this.rows) this._layoutCamera();
+      }
+    }
   }
 
   // ---------- input ----------
@@ -601,9 +978,12 @@ export class BoardRenderer {
   _loop(nowMs) {
     if (this.disposed) return;
     requestAnimationFrame(this._loop);
-    const dt = Math.min(0.05, (nowMs - this._last) / 1000);
+    const rawMs = Math.min(250, nowMs - this._last);
+    const dt = Math.min(0.05, rawMs / 1000);
     this._last = nowMs;
     if (document.hidden) return; // heartbeat: no rendering while hidden
+    const ambient = this.q.background === 'animated' && !this.reducedMotion && !(this._prm && this._prm.matches);
+    if (ambient) this.clock += dt;
 
     // tweens
     const keep = [];
@@ -649,9 +1029,20 @@ export class BoardRenderer {
       this.charmMeshes.forEach((m, i) => { m.count = charmCounts[i]; m.instanceMatrix.needsUpdate = true; });
     }
     // special meshes follow their entities
+    // (idle bob and fuse flicker under animated background, frozen under reduced motion)
     for (const e of this.entities) {
-      if (e.specialMesh) e.specialMesh.position.set(e.tx, e.ty, e.tz);
+      if (!e.specialMesh) continue;
+      const u = e.specialMesh.userData;
+      const bob = ambient ? Math.sin(this.clock * 2.2 + u.phase) * 0.035 : 0;
+      e.specialMesh.position.set(e.tx, e.ty + bob, e.tz);
+      if (u.spark) {
+        const f = ambient ? 0.75 + 0.25 * Math.sin(this.clock * 17 + u.phase) * Math.sin(this.clock * 7.3) : 1;
+        u.spark.scale.setScalar(f);
+      }
     }
+    if (this.motes.visible && ambient) this._updateMotes(this.clock);
+    // warm light shimmer: a slow, tiny breathing of the key light
+    this.keyLight.intensity = 2.2 * (ambient ? 1 + 0.025 * Math.sin(this.clock * 0.9) : 1);
 
     // particles
     const pos = this.pGeo.attributes.position.array;
@@ -667,7 +1058,20 @@ export class BoardRenderer {
     this.pGeo.attributes.position.needsUpdate = true;
 
     this._applyCamera();
-    this.renderer.render(this.scene, this.camera);
+    // keep the drawing buffer matched to the container (layout can change without a window resize)
+    const rescale = this._adapt(rawMs);
+    const cw = this.container.clientWidth, ch = this.container.clientHeight;
+    if (cw && ch) this._syncSize(cw, ch, rescale);
+    const pkey = this._postKey(this.size[0], this.size[1]);
+    if (pkey !== this.postKey) {
+      this.postKey = pkey;
+      this._buildPost(this.size[0], this.size[1]);
+      if (this.postFailed) this.postKey = this._postKey(this.size[0], this.size[1]);
+    }
+    if (this.composer) {
+      try { this.composer.render(dt); }
+      catch (err) { this.postFailed = true; this.composer = null; this.renderer.render(this.scene, this.camera); }
+    } else this.renderer.render(this.scene, this.camera);
   }
 
   dispose() {
@@ -678,6 +1082,10 @@ export class BoardRenderer {
       if (o.geometry) o.geometry.dispose();
       if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); }
     });
+    if (this.composer) this.composer.dispose();
+    if (this._envTex) this._envTex.dispose();
+    if (this._dotTex) this._dotTex.dispose();
+    this._fpsVisible(false);
     this.renderer.dispose();
     if (this.renderer.domElement.parentNode) this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
   }

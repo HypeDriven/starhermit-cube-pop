@@ -117,14 +117,17 @@
         <label><input type="checkbox" id="set-muted"> Mute all audio</label>
         <label><input type="checkbox" id="set-captions"> Show text captions for sounds</label>
       </fieldset>
-      <fieldset>
-        <legend>Graphics</legend>
-        <label>Quality tier
-          <select id="set-quality">
-            <option value="auto">Auto</option><option value="high">High</option>
-            <option value="medium">Medium</option><option value="low">Low</option>
-          </select>
-        </label>
+      <fieldset id="gfx-settings" class="gfx-settings">
+        <legend data-gfx-i18n="title">Graphics</legend>
+        <label><span data-gfx-i18n="quality">Quality</span> <select id="set-quality" data-gfx="preset"></select></label>
+        <label class="gfx-range"><span data-gfx-i18n="render_scale">Render scale</span>
+          <input type="range" id="set-gfx-scale" min="50" max="200" step="5" data-gfx="render_scale">
+          <output id="gfx-scale-val" for="set-gfx-scale">100%</output></label>
+        <div id="gfx-categories" class="gfx-categories"></div>
+        <label><input type="checkbox" id="set-gfx-adaptive" data-gfx="adaptive"> <span data-gfx-i18n="adaptive">Adaptive resolution</span></label>
+        <label><input type="checkbox" id="set-gfx-fps" data-gfx="show_fps"> <span data-gfx-i18n="show_fps">Show frame rate</span></label>
+        <p id="gfx-summary" class="gfx-summary muted"></p>
+        <p id="gfx-post-note" class="gfx-note" data-gfx-i18n="post_note" hidden></p>
         <label>Studio theme <select id="set-theme"></select></label>
       </fieldset>
       <fieldset>
@@ -258,12 +261,15 @@
   </div>
 </main>
 
+<script type="importmap">{"imports": {"three": "./vendor/three.module.min.js", "three/addons/": "./vendor/three/addons/"}}</script>
 <script src="js/rng.js"></script>
 <script src="js/rules.js"></script>
 <script src="js/content.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/platform.js"></script>
 <script src="js/session.js?v=production-qa-1"></script>
+<script src="js/gfx.js"></script>
+<script src="js/gfx-panel.js"></script>
 <script src="js/ui.js"></script>
 <script type="module" src="js/main.js"></script>
 </body>

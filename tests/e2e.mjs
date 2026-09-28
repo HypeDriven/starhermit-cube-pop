@@ -63,7 +63,7 @@ async function runPass(browser, passName, contextOpts) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {
-    if (m.type() !== 'error' || browserNoise.test(m.text())) return;
+    if ((m.type() !== 'error' && m.type() !== 'warning') || browserNoise.test(m.text())) return;
     // The game is offline-capable by design: without the StarHermit backend
     // it probes /api/v1/*, gets 404 from our static server, and degrades
     // gracefully. Only resource-load 404s for those probes are benign.
@@ -118,6 +118,42 @@ async function runPass(browser, passName, contextOpts) {
       await page.waitForSelector('#screen-title:not([hidden])');
     });
 
+    await step('Settings → Graphics: presets, override, persistence across reload', async () => {
+      await page.click('#screen-title [data-goto="settings"]');
+      await page.waitForSelector('#screen-settings:not([hidden])');
+      await page.locator('#gfx-settings').scrollIntoViewIfNeeded();
+      const autoLabel = await page.textContent('#set-quality option[value="auto"]');
+      if (!/Auto \(detected: Low\)/.test(autoLabel)) throw new Error('software GPU should detect Low: ' + autoLabel);
+      const bodyPreset = () => page.evaluate(() => document.body.dataset.gfxPreset);
+      await page.selectOption('#set-quality', 'low');
+      if (await bodyPreset() !== 'low') throw new Error('Low preset not applied');
+      await page.selectOption('#set-quality', 'high');
+      if (await bodyPreset() !== 'high') throw new Error('High preset not applied');
+      const fromLabel = await page.textContent('#set-gfx-bloom option[value="preset"]');
+      if (!/From preset \(On\)/.test(fromLabel)) throw new Error('bloom preset label wrong: ' + fromLabel);
+      await page.selectOption('#set-gfx-bloom', 'off');
+      await page.check('#set-gfx-fps');
+      const summary = await page.textContent('#gfx-summary');
+      if (/Bloom/.test(summary) || !/SMAA/.test(summary)) throw new Error('summary does not reflect override: ' + summary);
+      await page.screenshot({ path: shot('graphics', passName) });
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForSelector('#screen-title:not([hidden])');
+      if (await bodyPreset() !== 'high') throw new Error('preset did not survive reload');
+      await page.click('#screen-title [data-goto="settings"]');
+      await page.waitForSelector('#screen-settings:not([hidden])');
+      if (await page.inputValue('#set-quality') !== 'high') throw new Error('quality select lost High');
+      if (await page.inputValue('#set-gfx-bloom') !== 'off') throw new Error('bloom override lost on reload');
+      if (!(await page.isChecked('#set-gfx-fps'))) throw new Error('show fps lost on reload');
+      if (!(await page.isChecked('#set-reduced-motion'))) throw new Error('reduced motion lost on reload');
+      // Choosing a preset clears overrides; back to Auto (Low here) keeps the playthrough fast.
+      await page.selectOption('#set-quality', 'auto');
+      if (await page.inputValue('#set-gfx-bloom') !== 'preset') throw new Error('preset did not clear the override');
+      if (await bodyPreset() !== 'low') throw new Error('Auto should resolve to Low on a software GPU');
+      await page.uncheck('#set-gfx-fps');
+      await page.click('#screen-settings [data-goto="title"]');
+      await page.waitForSelector('#screen-title:not([hidden])');
+    });
+
     await step('daily screen shows offline fallback (no backend)', async () => {
       await page.click('#screen-title [data-goto="daily"]');
       await page.waitForSelector('#screen-daily:not([hidden])');
@@ -141,6 +177,8 @@ async function runPass(browser, passName, contextOpts) {
       focus = { r: 0, c: 0 };
       const board = await readBoard();
       if (board.length !== 36) throw new Error(`expected 6x6 mirror, got ${board.length} cells`);
+      const canvasPreset = await page.evaluate(() => document.querySelector('#gl-container canvas')?.dataset.gfxPreset);
+      if (canvasPreset !== 'low') throw new Error('studio canvas should render at Low (Auto), got ' + canvasPreset);
       await page.screenshot({ path: shot('game', passName) });
     });
 
@@ -235,6 +273,19 @@ async function runPass(browser, passName, contextOpts) {
       const nextLabel = await page.textContent('#btn-play');
       if (!/Play: Bigger is Better/.test(nextLabel)) throw new Error('stage 2 not unlocked: ' + nextLabel);
       await page.screenshot({ path: shot('title-after', passName) });
+    });
+
+    await step('Ultra preset renders a round without console errors', async () => {
+      await page.click('#screen-title [data-goto="settings"]');
+      await page.waitForSelector('#screen-settings:not([hidden])');
+      await page.selectOption('#set-quality', 'ultra');
+      await page.click('#screen-settings [data-goto="title"]');
+      await page.click('#btn-play');
+      await waitState('active');
+      await page.waitForTimeout(1500);
+      const p = await page.evaluate(() => document.querySelector('#gl-container canvas').dataset.gfxPreset);
+      if (p !== 'ultra') throw new Error('canvas not at Ultra: ' + p);
+      await page.screenshot({ path: shot('ultra', passName) });
     });
   } finally {
     await context.close();

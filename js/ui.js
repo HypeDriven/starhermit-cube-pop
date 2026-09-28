@@ -73,22 +73,23 @@
     Audio.setMuted(!!s.muted);
     if (app.renderer) {
       app.renderer.setReducedMotion(!!s.reducedMotion);
-      app.renderer.setQuality(resolveTier(s.quality));
+      app.renderer.setGraphics(s.graphics, app.gfx.detected, app.gfx.gpu);
       var theme = themeById(s.theme);
       if (!themeUnlocked(theme)) theme = Content.THEMES[0]; // e.g. after a progress reset
       app.renderer.setTheme(theme.palette, Content.COLORS, !!s.highContrast);
       if (app.session) app.renderer.syncToState(app.session.state);
     }
     $('captions').style.display = s.captions ? '' : 'none';
+    document.body.dataset.gfxPreset = root.CPGfx.resolve(s.graphics, app.gfx.detected).preset;
   }
-  function resolveTier(q) {
-    if (q && q !== 'auto') return q;
-    var cores = navigator.hardwareConcurrency || 4;
-    var mem = navigator.deviceMemory || 4;
-    var mobile = /Mobi|Android/i.test(navigator.userAgent);
-    if (mobile && (cores <= 4 || mem <= 3)) return 'low';
-    if (mobile || cores <= 4) return 'medium';
-    return 'high';
+  // Graphics settings live in the settings doc as `graphics` (see js/gfx.js);
+  // the old single `quality` tier migrates to the matching preset once.
+  function migrateGraphics(s) {
+    if (!s.graphics || typeof s.graphics !== 'object') {
+      var old = { high: 'high', medium: 'balanced', low: 'low' }[s.quality];
+      s.graphics = { preset: old || 'auto' };
+    } else s.graphics = Object.assign({}, s.graphics);
+    delete s.quality;
   }
   function themeById(id) {
     var t = Content.THEMES.filter(function (x) { return x.id === id; })[0];
@@ -105,7 +106,6 @@
     $('set-vol-ambience').value = s.volAmbience;
     $('set-muted').checked = !!s.muted;
     $('set-captions').checked = !!s.captions;
-    $('set-quality').value = s.quality;
     $('set-reduced-motion').checked = !!s.reducedMotion;
     $('set-high-contrast').checked = !!s.highContrast;
     $('set-large-text').checked = !!s.largeText;
@@ -126,7 +126,19 @@
     $('set-vol-ambience').oninput = function () { s.volAmbience = +this.value; save(); };
     $('set-muted').onchange = function () { s.muted = this.checked; save(); };
     $('set-captions').onchange = function () { s.captions = this.checked; save(); };
-    $('set-quality').onchange = function () { s.quality = this.value; save(); toast('Quality tier: ' + this.value); };
+    app.gfxRefresh = root.CPGfxPanel.bind(
+      function () { return app.settings.graphics; },
+      function (g) {
+        // graphics apply live without rebuilding the rest of the settings
+        app.settings.graphics = g;
+        Sess.saveSettings(app.settings);
+        document.body.dataset.gfxPreset = root.CPGfx.resolve(g, app.gfx.detected).preset;
+        if (app.renderer) {
+          app.renderer.setGraphics(g, app.gfx.detected, app.gfx.gpu);
+          if (app.session) app.renderer.syncToState(app.session.state);
+        }
+      },
+      function () { return app.renderer ? app.renderer.graphicsInfo() : null; });
     $('set-theme').onchange = function () { s.theme = this.value; save(); };
     $('set-reduced-motion').onchange = function () { s.reducedMotion = this.checked; save(); };
     $('set-high-contrast').onchange = function () { s.highContrast = this.checked; save(); };
@@ -480,6 +492,7 @@
     if (app.renderer || app.webglFailed) return;
     try {
       app.renderer = app.createRenderer($('gl-container'), {
+        graphics: app.settings.graphics, gpu: app.gfx.gpu, detected: app.gfx.detected,
         onPick: function (cell) { tryPop(cell.r, cell.c); },
         onHover: function (cell) {
           if (!app.session || app.state !== 'active' || !app.renderer) return;
@@ -494,7 +507,7 @@
         }
       });
       app.renderer.setReducedMotion(!!app.settings.reducedMotion);
-      app.renderer.setQuality(resolveTier(app.settings.quality));
+      app.renderer.setGraphics(app.settings.graphics, app.gfx.detected, app.gfx.gpu);
     } catch (e) {
       app.webglFailed = true;
       $('webgl-fail').hidden = false;
@@ -1153,6 +1166,13 @@
     Rules = root.CPRules; Content = root.CPContent; Sess = root.CPSession; Audio = root.CPAudio;
     app.createRenderer = deps.createRenderer;
     app.settings = Sess.loadSettings();
+    app.gfx = root.CPGfxPanel.probe();
+    migrateGraphics(app.settings);
+    // live frame-rate / resolution line while Settings is open
+    setInterval(function () {
+      var scr = $('screen-settings');
+      if (app.gfxRefresh && scr && !scr.hidden && app.renderer) app.gfxRefresh();
+    }, 1000);
     app.progress = Sess.loadProgress();
 
     // Platform handshake: token read, remote save wins, account nickname.

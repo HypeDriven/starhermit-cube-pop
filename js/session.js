@@ -32,7 +32,7 @@
   // ---------- settings ----------
   var DEFAULT_SETTINGS = {
     volMusic: 0.5, volEffects: 0.8, volAmbience: 0.4, muted: false,
-    quality: 'auto',          // auto | high | medium | low
+    graphics: null,           // {preset, render_scale, adaptive, show_fps, <category>} — js/gfx.js
     reducedMotion: false, highContrast: false, largeText: false,
     leftHanded: false, captions: true, confirmPop: false,
     theme: 'daybreak'

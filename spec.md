@@ -3,7 +3,7 @@
 **Pitch:** Tap a cluster of matching toy cubes to pop it; pop five to forge a rocket, eight to forge a bomb, and set them off in chains to fill colour quotas on a cheerful 3D toy-studio wall.
 **Genre:** Cluster-pop puzzle (single tap, gravity refill, colour quotas). **Players:** 1, with an asynchronous server-validated daily leaderboard. **Session:** 1–4 minutes per round; 40-stage journey, 6 challenges, 7 lessons, daily seed, endless score chase.
 **Platforms:** Desktop and mobile browsers (Chrome, Safari, Firefox), portrait and landscape, keyboard, mouse, touch and gamepad.
-**Rendering:** Three.js (`vendor/three.module.min.js`) draws an instanced wall of rounded cubes in a lit toy studio; every menu, HUD element and overlay is semantic HTML. A DOM mirror grid makes the board playable without WebGL.
+**Rendering:** Three.js r160 (`vendor/three.module.min.js`, addons under `vendor/three/addons/`, both mapped by an import map) draws an instanced wall of rounded cubes in a lit toy studio; every menu, HUD element and overlay is semantic HTML. A DOM mirror grid makes the board playable without WebGL.
 
 | Path | Responsibility |
 |---|---|
@@ -14,7 +14,9 @@
 | `js/content.js` | Versioned content: 6 cube colours, 5 themes, 40 journey stages, 6 challenges, 3 practice presets, score-chase ruleset, daily generator, 7 lessons, 11 achievements |
 | `js/session.js` | Round lifecycle over the engine: command ids, undo stack, replay envelope, stars, localStorage docs, server-time sync, daily submit/board |
 | `js/audio.js` | WebAudio buses, authored Opus one-shots with synth fallbacks, ambience loop, seeded pentatonic music |
-| `js/render.js` | `BoardRenderer`: studio environment, instanced cubes + charms, special meshes, particles, markers, camera, pointer input |
+| `js/render.js` | `BoardRenderer`: studio environment, instanced cubes + charms, special meshes, particles, dust motes, markers, camera, pointer input, graphics settings, post chain, adaptive resolution |
+| `js/gfx.js` | Pure graphics quality model: presets, categories, GPU → preset detection, `resolve`, `presetTier`, `choosePreset`, `describe` |
+| `js/gfx-panel.js` | Settings → Graphics controls, GPU probe, panel strings in nine locales |
 | `js/ui.js` | Screens, HUD, settings, board mirror, keyboard/gamepad, rounds, pause/results, persistence glue; `CPUI.init` |
 | `js/main.js` | ES-module bootstrap: WebGL detection, renderer factory, `CPUI.init` |
 | `server.js` | StarHermit game script: static hosting, `/api/v1/time`, daily board read, daily submit with full replay validation |
@@ -22,6 +24,7 @@
 | `assets/` | `title-keyart.webp`, `results-banner.webp`, `table-wood.webp`, `toy-rocket.glb` |
 | `sfx/` | 21 Opus clips, `manifest.txt` (canonical), `manifest.json` (generator input), `manifest.md` (generator output) |
 | `tests/rules.test.js` | 37 engine/content unit, property, fuzz and golden tests (`npm test`) |
+| `tests/gfx.test.js` | Graphics model tests under `node --test` (`npm test`) |
 | `tests/e2e.mjs` | Playwright playthrough of the real UI at desktop and mobile viewports (`npm run test:e2e`) |
 | `tests/browser-smoke.html` | Iframe smoke page for headless Chrome `--dump-dom` |
 | `tools/smoke-server.js`, `tools/validate-content.js` | Dev-only: API round-trip test; offline content validator |
@@ -141,10 +144,19 @@ Cube Pop is the feeling of sweeping a shelf of toy blocks off a table with one f
 **Cube colours** (`Content.COLORS`, high-contrast variant in brackets): Cherry `#e4574f` (`#d62828`), Lemon `#f2c14e` (`#f5d90a`), Leaf `#5da85f` (`#17a398`), Sky `#5b8fd4` (`#2e6fe4`), Grape `#9a6fc8` (`#8e24aa`), Tangerine `#ef8b4a` (`#ef6c00`). Charms are cream `#fff6e8`: sphere, star, cone, octahedron, torus, icosahedron.
 **Themes** (`Content.THEMES`, wall / table / accent): Sunny Studio `#f6e3c8 / #c98d5f / #ff9d5c`; Mint Workshop `#d8efe0 / #7fae8e / #6fce9a`; Twilight Loft `#2c3350 / #4a4f78 / #8fa8ff`; Candy Corner `#fbe0ea / #d887ac / #ff8fb8`; Ivory Attic `#f2eee6 / #b8a88e / #e8c07a`. Each also sets floor, frame, key-light and fog colours.
 
-**Shape language:** rounded-square extrusions with bevels (`roundedCubeGeo`, radius 18 % of the edge), specials as a cube with a cone-and-fin rocket or a sphere-and-fuse bomb on top, chunky shelf props (spheres and cones). UI uses 12 px radii, 2 px translucent borders and pill toasts.
+**Shape language:** rounded-square extrusions with bevels (`roundedCubeGeo`: 10 % bevel plus 10 % corner radius, inset so the finished cube measures exactly its edge and neighbours leave a visible gap), specials as a cube with a cone-and-fin rocket or a sphere-and-fuse bomb on top, chunky shelf props (spheres and cones). UI uses 12 px radii, 2 px translucent borders and pill toasts.
 **Typography:** system UI stack, 16 px base (20 px with Larger text), tabular numerals for score, moves, time and quotas; 70 ch maximum line length on menu screens.
-**Lighting:** ACES tone mapping at exposure 1.05, warm directional key (theme `light`) with 1024² PCF soft shadows, hemisphere fill, low ambient, fog at 18-40 units. The hero of the screen is the cube wall: the camera (38° fov) frames it to fill the playfield; environment stays desaturated and behind.
-**Motion:** pop 160 ms shrink with 10-particle bursts, fall 220 ms smoothstep, blasts 260 ms staggered 90 ms per chain step with camera shake ≤ 0.3, refill drops from above (340 ms), shuffle 450 ms, win/wave confetti ring. Quality tiers cap DPR (2 / 1.5 / 1), shadows and particle counts (160 / 80 / 30). **Reduced motion:** no countdown, no tweens (state snaps via `syncToState`), no shake, no hover lift, no button transitions.
+**Lighting:** ACES tone mapping at exposure 1.05 with sRGB output, warm directional key (theme `light`) with PCF soft shadows whose orthographic frustum is fitted to the wall, table top and the strip of back wall behind it (`_fitShadow`), hemisphere fill, low ambient, a cool rim light at Detailed, fog at 18-40 units. The hero of the screen is the cube wall: the camera (38° fov) frames it to fill the playfield; environment stays desaturated and behind.
+**Motion:** pop 160 ms shrink with 10-particle bursts, fall 220 ms smoothstep, blasts 260 ms staggered 90 ms per chain step with camera shake ≤ 0.3, refill drops from above (340 ms), shuffle 450 ms, win/wave confetti ring. Graphics presets cap DPR (Low 1, Balanced 1.5, High/Ultra 2), shadows and particles (see Graphics). **Reduced motion:** no countdown, no tweens (state snaps via `syncToState`), no shake, no hover lift, no button transitions.
+
+**Graphics.** At Detailed the cubes are soft-touch toy plastic (`MeshPhysicalMaterial`, roughness 0.5, a thin 0.4 clearcoat), specials get a glossy clearcoat and the bomb fuse carries an over-bright spark; the studio gains a procedural striped wallpaper, floorboards, a skirting board and extra shelf toys (a stack of blocks, a ring). Reflections light PBR materials from a `RoomEnvironment` PMREM as `scene.environment` at low `envMapIntensity` (0.2–0.4) so colours stay saturated. The optional post chain (EffectComposer: RenderPass → GTAO contact shadows → UnrealBloom at threshold 0.9 that catches only the fuse spark and particle sparkles → a colour grade with a gentle S-curve, +10 % saturation, warm highlights and a soft vignette → OutputPass → SMAA or FXAA; MSAA uses a 4-sample target) runs only when an effect needs it. High particles are larger soft round confetti with every fifth one an over-bright sparkle; animated background adds drifting dust motes in the key light, a slow key-light shimmer, an idle bob on specials and a flickering fuse, all frozen by the reduced-motion setting or `prefers-reduced-motion`. Settings → **Graphics** offers Quality (Auto, detected from the WebGL unmasked renderer: SwiftShader/llvmpipe → Low, discrete GPUs and Apple M → High, otherwise Balanced, capped at Balanced on touch devices; Low; Balanced; High; Ultra), a render scale slider (50–200 % of the preset's scale), one select per category defaulting to "From preset (…)" — shadows off/low/medium/high (1024²/2048²/4096²), ambient occlusion off/on/high, bloom, colour grade, anti-aliasing off/FXAA/SMAA/MSAA, reflections, particles low/high, ambient motion still/animated, studio detail plain/detailed — adaptive resolution (averages 90 frames; above 26 ms steps the scale down 0.1 to 0.6, below 14 ms back up 0.05 to 1) and a frame-rate readout (bottom-left, `#fps-meter`), plus a summary line "GPU · effects · W×H px" and a note when post-processing cannot be built (the studio then renders without it). Choosing a preset clears overrides; changes apply live and persist in `cubepop:settings:v1` as `graphics` (the older single `quality` tier migrates to the matching preset). The resolved preset is mirrored as `data-gfx-preset` on `<body>` and the studio canvas. Pixel ratio = min(DPR, preset cap) × preset scale × render scale × adaptive scale; Low renders straight to the canvas with no composer, no shadows, plain materials and 30-particle bursts. Presets:
+
+| Preset | Scale | Shadows | AO | Bloom | Grade | AA | Reflections | Particles | Background | Detail |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Low | 1 | off | off | off | off | MSAA (canvas) | off | low | static | plain |
+| Balanced | 1 | low | off | on | on | FXAA | on | high | animated | detailed |
+| High | 1 | medium | on | on | on | SMAA | on | high | animated | detailed |
+| Ultra | 1.25 | high | high | on | on | MSAA | on | high | animated | detailed |
 
 **Visual assets the design calls for:** title key art (studio wall at rest), results celebration banner (rocket launch over cubes), a wood-grain table texture, a hero toy-rocket model, cover art and icon. All exist; see §15.
 
@@ -183,7 +195,7 @@ Cube Pop is the feeling of sweeping a shelf of toy blocks off a table with one f
 
 ## 9. Localization
 
-**Shipped language:** English only. Every string is authored inline in `index.html` (screen copy, settings labels, help table), `js/ui.js` (announcements, toasts, results labels, hint reasons) and `js/content.js` (stage names, intros, lesson text, achievement names). `<html lang="en">` is fixed and there is no language selector.
+**Shipped language:** English only, except the Settings → Graphics panel, whose strings (`js/gfx-panel.js`) ship in en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR and it-IT, chosen from `navigator.languages`. Every string is authored inline in `index.html` (screen copy, settings labels, help table), `js/ui.js` (announcements, toasts, results labels, hint reasons) and `js/content.js` (stage names, intros, lesson text, achievement names). `<html lang="en">` is fixed and there is no language selector.
 **Contract (design intent, see §17):** ship en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR and it-IT from a string table keyed by id, chosen from `navigator.languages` with a settings override; layouts already reserve 30 % expansion (cards wrap, tray wraps, overlay cards scroll, `max-width: 70ch`).
 
 ## 10. Accessibility
@@ -191,7 +203,7 @@ Cube Pop is the feeling of sweeping a shelf of toy blocks off a table with one f
 - **Keyboard-only path:** skip link → title buttons → any screen → game: arrows move the focus ring on the 3D wall and the mirror grid in lock-step, Enter pops, H/U/P/C act, overlays trap focus on their first button and restore `lastFocusEl` on resume. No hover-only information: focus previews the same outline hover does.
 - **Screen reader:** `#board-mirror` is a table of buttons labelled `Row r column c: Colour, group of n | row rocket | column rocket | bomb | empty`; `#live-status` (polite) announces stage intro, legal-move summary, every pop with score, hints, waves, shuffles, pauses and results; `#live-alert` (assertive) carries rejections and context loss. Goal rail rows read `Colour have / need`.
 - **Colour independence:** each colour has an icon, a label and a 3D charm shape; goal swatches carry the icon; hint outline is gold, invalid outline red, both with text.
-- **Settings:** reduced motion (also honours `prefers-reduced-motion` for CSS), high-contrast cube palette and UI tokens, larger text, left-handed tray, captions for sounds, quality tier, theme, replay tutorial, reset progress.
+- **Settings:** reduced motion (also honours `prefers-reduced-motion` for CSS), high-contrast cube palette and UI tokens, larger text, left-handed tray, captions for sounds, Graphics (quality preset, render scale, per-effect overrides, adaptive resolution, frame rate), theme, replay tutorial, reset progress.
 - **Targets and contrast:** buttons ≥ 44 × 44 px with 8 px gaps; ink `#3d2f23` on `#fff8ee` ≈ 10.9:1; focus outline 3 px `#2e6fe4`.
 - **Grid mode:** when WebGL is missing or the context is lost, the mirror grid becomes visible and remains fully playable with the same commands.
 
@@ -207,23 +219,23 @@ Manifest `starhermit.txt`: `name=Cube Pop`, `launch=index.html`, `owner=<uuid>`,
 
 ## 12. Technical architecture
 
-- **Module contract:** `rules` is pure (no DOM, no clock, no `Math.random`); `content` is data plus the daily/tutorial generators; `session` is the only writer of rules state on the client and owns ids, undo, snapshots and the envelope; `render` consumes state snapshots and event lists; `ui` owns screens, timers and settings; `audio` owns WebAudio. Script order in `index.html`: rng → rules → content → audio → session → ui → main (module).
+- **Module contract:** `rules` is pure (no DOM, no clock, no `Math.random`); `content` is data plus the daily/tutorial generators; `session` is the only writer of rules state on the client and owns ids, undo, snapshots and the envelope; `render` consumes state snapshots and event lists; `ui` owns screens, timers and settings; `audio` owns WebAudio. Script order in `index.html`: import map → rng → rules → content → audio → platform → session → gfx → gfx-panel → ui → main (module). `gfx` is pure (no DOM, no three.js) and shared by the panel and the renderer.
 - **Determinism and replay:** 32-bit mulberry32 with stored `rngState`; quantised `elapsedMs`; `hashState` over a stable-stringified state without `events`; server re-simulation is the acceptance test for daily scores. `tools/validate-content.js` proves legality, reachable goals, no soft locks and bounded duration for every shipped config.
 - **Persistence (localStorage):** `cubepop:settings:v1`, `cubepop:progress:v1` (`v, stars, completed, dailiesDone, totalCubes, sum` — corrupt checksum resets safely), `cubepop:achievements:v1`, `cubepop:saved-round:v1` (config, serialised state, commands, init hash), `cubepop:daily-best:v1`, `cubepop:score-best:v1`, `cubepop:name`. Tutorials are never snapshotted.
-- **Rendering budget:** one `InstancedMesh` per colour for cubes and one for charms (≤ 64 instances each), ≤ 12 special groups, 80 pooled marker quads, one 2048-point particle buffer, ≤ 20 environment meshes: about 30 draw calls. Rendering stops while the tab is hidden. Quality tier auto-resolves from cores / memory / mobile UA and can be forced.
+- **Rendering budget:** one `InstancedMesh` per colour for cubes and one for charms (≤ 64 instances each), ≤ 12 special groups, 80 pooled marker quads, one 2048-point particle buffer, ≤ 25 environment meshes, one 70-point mote cloud: about 35 draw calls. Rendering stops while the tab is hidden. The drawing buffer follows the container's size every frame, so layout changes never crop the wall.
 - **Resilience:** WebGL absent → compatibility card and grid mode; context lost → alert and grid mode with the round intact; missing images hide themselves (`onerror`), missing texture keeps the flat colour, missing clip keeps the synth cue; API failure keeps the game playable.
-- **E2E automation:** `tests/e2e.mjs` serves the repo with an embedded static server (no API), launches system Chrome via `playwright-core`, and for desktop (1280×800) and mobile (390×844, touch) clicks the real buttons: settings → reduced motion, daily screen offline note, Play, keyboard pops chosen by reading the mirror grid, Undo, Hint, Pause/Resume, plays stage 1 to the results card, returns to the title and checks persisted progress. Any console error or page error fails the run.
+- **E2E automation:** `tests/e2e.mjs` serves the repo with an embedded static server (no API), launches system Chrome via `playwright-core`, and for desktop (1280×800) and mobile (390×844, touch) clicks the real buttons: settings → reduced motion, daily screen offline note, Play, keyboard pops chosen by reading the mirror grid, Undo, Hint, Pause/Resume, plays stage 1 to the results card, returns to the title and checks persisted progress. A Graphics step picks Low then High, overrides bloom, turns on the frame rate, reloads and checks everything persisted, then returns to Auto (Low on the software GPU) and confirms the studio canvas renders at Low; a last step plays a round at Ultra. Any console error, warning or page error fails the run.
 
 ## 13. Testing and acceptance criteria
 
-`npm test` (`tests/rules.test.js`, 37 tests): deterministic creation; fresh boards always have a move; group detection; every rejection reason; pop/goal/refill; monotonic tick; gravity; rocket at 5+, column orientation, bomb at 8+; row-rocket and bomb blast shapes; chains; specials never join groups; win bonuses; move, time and resign losses; reshuffle guard; endless banking; hint preferences; serialisation round-trip; replay property (same log ⇒ same hashes); failed commands never mutate; malformed-command fuzz; 200-seed random-play fuzz (no NaN, no dead states); all 40 journey stages well-formed and the first five greedy-winnable; challenges/practice/score chase well-formed; daily determinism; lesson fixtures legal and goals reachable; golden outcome hash; interrupted + resumed equals continuous play; tick expiry.
+`npm test` runs `tests/rules.test.js` (37 tests) and `tests/gfx.test.js` (GPU detection, auto/explicit presets, overrides, scale clamp, preset clears overrides, cost summary). Rules tests cover: deterministic creation; fresh boards always have a move; group detection; every rejection reason; pop/goal/refill; monotonic tick; gravity; rocket at 5+, column orientation, bomb at 8+; row-rocket and bomb blast shapes; chains; specials never join groups; win bonuses; move, time and resign losses; reshuffle guard; endless banking; hint preferences; serialisation round-trip; replay property (same log ⇒ same hashes); failed commands never mutate; malformed-command fuzz; 200-seed random-play fuzz (no NaN, no dead states); all 40 journey stages well-formed and the first five greedy-winnable; challenges/practice/score chase well-formed; daily determinism; lesson fixtures legal and goals reachable; golden outcome hash; interrupted + resumed equals continuous play; tick expiry.
 
 `npm run test:e2e` passes when both viewport passes complete every step above with zero console errors. `node tools/smoke-server.js` boots `server.js`, plays a daily round, submits the envelope and reads back the board.
 
 QA bar (agents/qa.md) as checkable statements: (1) a new player sees instructions in the first stage intro, the Learn lessons and Help before any mechanic is required; (2) every mode, setting, overlay and button is reachable and works in the browser at 1280×800 and 390×844; (3) no console errors or warnings during a full playthrough; (4) no text or control is cut off on desktop, portrait or landscape mobile; (5) daily scores go through the StarHermit game script.
 
 ## 14. Performance budgets
-60 fps on desktop at `high`; 30 fps floor on low-end mobile at `low` (DPR 1, no shadows, 30 particles per burst). Frame work is instance-matrix writes for ≤ 64 cubes + charms, a 2048-point particle update and one render; no per-frame allocations beyond three reusable math objects. Total shipped payload ≈ 0.7 MB core (three.js 670 KB) + 60 KB images + ~0.5 MB audio (lazy) + 1.4 MB optional model (not loaded).
+60 fps on desktop at High; 30 fps floor on low-end mobile at Low (DPR 1, no shadows, no post chain, 30 particles per burst); adaptive resolution trades pixels for frame time on every preset. Frame work is instance-matrix writes for ≤ 64 cubes + charms, a 2048-point particle update and one render; no per-frame allocations beyond three reusable math objects. Total shipped payload ≈ 0.7 MB core (three.js 670 KB) + 60 KB images + ~0.5 MB audio (lazy) + 1.4 MB optional model (not loaded).
 
 ## 15. Asset inventory
 
@@ -237,7 +249,8 @@ QA bar (agents/qa.md) as checkable statements: (1) a new player sees instruction
 | `icon.png`, `favicon.svg` | Platform icon, tab icon | authored | shipped |
 | `sfx/*.opus` (16 original clips) | Event sounds, §8 | MOSS-SFX v2, 100 steps | shipped |
 | `sfx/countdown-tick.opus`, `countdown-go.opus`, `goal-fill.opus`, `time-warning.opus`, `studio-ambience.opus` | New cues, §8 | MOSS-SFX v2, 100 steps | generated in this pass, wired with synth fallbacks |
-| `vendor/three.module.min.js` | Renderer library | three.js | shipped |
+| `vendor/three.module.min.js` | Renderer library | three.js 0.160.1 | shipped |
+| `vendor/three/addons/` | EffectComposer, Render/Shader/Output/GTAO/UnrealBloom/SMAA passes, FXAA/GTAO/SMAA/copy/output/luminosity/denoise shaders, SimplexNoise, RoomEnvironment | three.js 0.160.1 `examples/jsm` (same revision) | shipped |
 
 ## 16. Known limitations
 

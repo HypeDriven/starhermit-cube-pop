@@ -114,6 +114,20 @@ body.high-contrast {
 .settings-form fieldset { border: 2px solid #0002; border-radius: var(--radius); margin: 10px 0; background: var(--panel); }
 .settings-form label { display: block; margin: 10px 4px; min-height: 44px; }
 .settings-form input[type=range] { width: min(260px, 60vw); vertical-align: middle; }
+/* Graphics section: label + control share a row, wrapping only when the label is long */
+.gfx-settings label:not(.gfx-range) select { max-width: 100%; }
+.gfx-categories { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); column-gap: 16px; }
+.gfx-categories label { display: grid; grid-template-columns: minmax(6.5em, 1fr) minmax(0, 13.5em); align-items: center; gap: 8px; margin: 4px; }
+.gfx-categories select { width: 100%; }
+.gfx-settings select { min-height: 44px; font: inherit; max-width: 100%; }
+.gfx-range { display: flex !important; align-items: center; gap: 8px; }
+.gfx-range input[type=range] { flex: 1 1 auto; min-width: 0; width: auto; }
+.gfx-range output { flex: 0 0 4.5ch; text-align: right; font-variant-numeric: tabular-nums; }
+.gfx-summary { font-size: 0.85rem; margin: 8px 4px; overflow-wrap: anywhere; }
+.gfx-note { margin: 8px 4px; padding: 8px; border-radius: 8px; background: #f2c14e33; border-left: 4px solid var(--accent-2); }
+#fps-meter { position: fixed; left: calc(8px + var(--sal)); bottom: calc(8px + var(--sab)); z-index: 50;
+  pointer-events: none; padding: 2px 8px; border-radius: 8px; background: #3d2f23cc; color: #fff;
+  font: 12px/1.6 ui-monospace, monospace; }
 
 /* ---------- help ---------- */
 .help-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
