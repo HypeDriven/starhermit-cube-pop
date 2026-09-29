@@ -271,3 +271,7 @@ QA bar (agents/qa.md) as checkable statements: (1) a new player sees instruction
 - Send achievements through the platform; global and friends boards for Score Chase with a seed shared per UTC day (identity and validated daily submissions are done).
 - Authored music stems per theme in place of the synthesised pentatonic loop.
 - Count the fired special's cell once (with a golden-hash update and content version bump).
+
+## Browser interference
+
+`browser-guard.js` (loaded from `index.html`) suppresses browser UI that gets in the way of play: the right-click context menu, the iOS long-press callout, copy / cut / paste, and page text selection. Text fields (inputs, textareas, selects, contenteditable) keep normal selection, context menu and clipboard behaviour.
