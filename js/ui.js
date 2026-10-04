@@ -18,6 +18,44 @@
 
   function announce(msg) { $('live-status').textContent = ''; $('live-status').textContent = msg; }
   function announceAlert(msg) { $('live-alert').textContent = ''; $('live-alert').textContent = msg; }
+  var PT = {
+    'en-US': { offline: 'Offline — progress is stored on this device.', playing: 'Playing as {name}', synced: 'progress synced', saving: 'saving…', nosync: 'cloud sync unavailable', signIn: 'Sign in with StarHermit', invite: 'Invite a friend', copied: 'Invite link copied to the clipboard.', copyFail: 'Could not copy — invite link: {link}' },
+    'en-GB': { offline: 'Offline — progress is stored on this device.', playing: 'Playing as {name}', synced: 'progress synced', saving: 'saving…', nosync: 'cloud sync unavailable', signIn: 'Sign in with StarHermit', invite: 'Invite a friend', copied: 'Invite link copied to the clipboard.', copyFail: 'Could not copy — invite link: {link}' },
+    'es-419': { offline: 'Sin conexión: el progreso se guarda en este dispositivo.', playing: 'Jugando como {name}', synced: 'progreso sincronizado', saving: 'guardando…', nosync: 'sincronización en la nube no disponible', signIn: 'Iniciar sesión con StarHermit', invite: 'Invitar a un amigo', copied: 'Enlace de invitación copiado al portapapeles.', copyFail: 'No se pudo copiar. Enlace de invitación: {link}' },
+    'es-ES': { offline: 'Sin conexión: el progreso se guarda en este dispositivo.', playing: 'Jugando como {name}', synced: 'progreso sincronizado', saving: 'guardando…', nosync: 'sincronización en la nube no disponible', signIn: 'Iniciar sesión con StarHermit', invite: 'Invitar a un amigo', copied: 'Enlace de invitación copiado al portapapeles.', copyFail: 'No se ha podido copiar. Enlace de invitación: {link}' },
+    'de-DE': { offline: 'Offline – der Fortschritt wird auf diesem Gerät gespeichert.', playing: 'Du spielst als {name}', synced: 'Fortschritt synchronisiert', saving: 'wird gespeichert…', nosync: 'Cloud-Synchronisierung nicht verfügbar', signIn: 'Mit StarHermit anmelden', invite: 'Freund einladen', copied: 'Einladungslink in die Zwischenablage kopiert.', copyFail: 'Kopieren fehlgeschlagen – Einladungslink: {link}' },
+    'fr-FR': { offline: 'Hors ligne : la progression est enregistrée sur cet appareil.', playing: 'Vous jouez en tant que {name}', synced: 'progression synchronisée', saving: 'enregistrement…', nosync: 'synchronisation cloud indisponible', signIn: 'Se connecter avec StarHermit', invite: 'Inviter un ami', copied: 'Lien d’invitation copié dans le presse-papiers.', copyFail: 'Copie impossible — lien d’invitation : {link}' },
+    'fr-CA': { offline: 'Hors ligne : la progression est enregistrée sur cet appareil.', playing: 'Vous jouez en tant que {name}', synced: 'progression synchronisée', saving: 'enregistrement…', nosync: 'synchronisation infonuagique non disponible', signIn: 'Se connecter avec StarHermit', invite: 'Inviter un ami', copied: 'Lien d’invitation copié dans le presse-papiers.', copyFail: 'Copie impossible — lien d’invitation : {link}' },
+    'pt-BR': { offline: 'Offline — o progresso fica salvo neste dispositivo.', playing: 'Jogando como {name}', synced: 'progresso sincronizado', saving: 'salvando…', nosync: 'sincronização na nuvem indisponível', signIn: 'Entrar com StarHermit', invite: 'Convidar um amigo', copied: 'Link de convite copiado para a área de transferência.', copyFail: 'Não foi possível copiar — link de convite: {link}' },
+    'it-IT': { offline: 'Offline: i progressi sono salvati su questo dispositivo.', playing: 'Giochi come {name}', synced: 'progressi sincronizzati', saving: 'salvataggio…', nosync: 'sincronizzazione cloud non disponibile', signIn: 'Accedi con StarHermit', invite: 'Invita un amico', copied: 'Link di invito copiato negli appunti.', copyFail: 'Impossibile copiare. Link di invito: {link}' }
+  };
+  var P_STR = PT[root.CPGfxPanel ? root.CPGfxPanel.pickLocale(navigator.languages || [navigator.language]) : 'en-US'] || PT['en-US'];
+
+  // ---------- key bindings (platform overrides via StarHermit controls) ----------
+  var DEFAULT_KEYS = {
+    up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'],
+    pop: ['Enter', 'Space'], hint: ['KeyH'], undo: ['KeyU'], pause: ['KeyP', 'Escape'], camera: ['KeyC']
+  };
+  var bindings = DEFAULT_KEYS, keyAction = {};
+  function setBindings(b) {
+    bindings = b; keyAction = {};
+    Object.keys(b).forEach(function (a) { (b[a] || []).forEach(function (code) { keyAction[code] = a; }); });
+    renderKeyHelp();
+  }
+  function keyName(code) {
+    return String(code).replace(/^Key/, '').replace(/^Digit/, '').replace(/^Arrow(.*)$/, '$1');
+  }
+  function keysText(action) { return (bindings[action] || []).map(keyName).join(' / '); }
+  function renderKeyHelp() {
+    function put(id, text) { var e = document.getElementById(id); if (e) e.textContent = text; }
+    put('key-move', ['up', 'down', 'left', 'right'].map(keysText).join(', '));
+    put('key-pop', keysText('pop'));
+    put('key-hint', keysText('hint'));
+    put('key-undo', keysText('undo'));
+    put('key-pause', keysText('pause'));
+    put('key-camera', keysText('camera') + ' (reset)');
+  }
+
   function toast(msg, ms) {
     var t = $('toast');
     t.textContent = msg; t.hidden = false;
@@ -99,6 +137,14 @@
     return Sess.totalStars(app.progress) >= t.unlockStars;
   }
 
+  // Local save plus the platform settings KV mirror (once the boot read of the
+  // platform values has been applied, so those win).
+  function saveSettings() {
+    Sess.saveSettings(app.settings);
+    var P = root.CPPlatform;
+    if (P && P.hosted && app.platformSettingsReady) P.patchSettings(app.settings);
+  }
+
   function bindSettings() {
     var s = app.settings;
     $('set-vol-music').value = s.volMusic;
@@ -120,7 +166,7 @@
     });
     themeSel.value = themeUnlocked(themeById(s.theme)) ? s.theme : Content.THEMES[0].id;
 
-    function save() { Sess.saveSettings(app.settings); applySettings(); }
+    function save() { saveSettings(); applySettings(); }
     $('set-vol-music').oninput = function () { s.volMusic = +this.value; save(); };
     $('set-vol-effects').oninput = function () { s.volEffects = +this.value; save(); Audio.pop(3); };
     $('set-vol-ambience').oninput = function () { s.volAmbience = +this.value; save(); };
@@ -131,7 +177,7 @@
       function (g) {
         // graphics apply live without rebuilding the rest of the settings
         app.settings.graphics = g;
-        Sess.saveSettings(app.settings);
+        saveSettings();
         document.body.dataset.gfxPreset = root.CPGfx.resolve(g, app.gfx.detected).preset;
         if (app.renderer) {
           app.renderer.setGraphics(g, app.gfx.detected, app.gfx.gpu);
@@ -286,31 +332,74 @@
     }
     el.className = 'net-ok';
     var name = Platform.profile ? Platform.profile.name : '…';
-    el.textContent = 'Playing as ' + name + ' · ' +
-      (Platform.sync === 'synced' ? 'progress synced'
-        : Platform.sync === 'saving' ? 'saving…'
-        : 'cloud sync pending');
+    el.textContent = P_STR.playing.replace('{name}', name) + ' · ' +
+      (Platform.sync === 'synced' ? P_STR.synced : Platform.sync === 'saving' ? P_STR.saving : P_STR.nosync);
   }
 
+  // Title: sign-in (on *.starhermit.com without a token) / Invite a friend.
+  function renderPlatformButtons() {
+    var P = root.CPPlatform;
+    if (!P) return;
+    var canSign = P.canSignIn(), canInvite = P.hosted && !!P.inviteLink();
+    $('btn-signin').hidden = !canSign;
+    $('btn-invite').hidden = !canInvite;
+    $('title-platform').hidden = !canSign && !canInvite;
+  }
+  function inviteFriend() {
+    var link = root.CPPlatform.inviteLink();
+    if (!link) return;
+    var fail = function () { toast(P_STR.copyFail.replace('{link}', link), 6000); };
+    try { navigator.clipboard.writeText(link).then(function () { toast(P_STR.copied); }, fail); } catch (e) { fail(); }
+  }
+
+  // Signed-in boot work: nickname, remote save (wins), settings KV, bindings.
+  function syncFromPlatform() {
+    var Platform = root.CPPlatform;
+    if (!Platform || !Platform.hosted) return;
+    Platform.fetchProfile().then(function () {
+      renderNetStatus();
+      // The account nickname replaces the free-text name on submissions.
+      var nameInput = $('daily-name');
+      if (nameInput && Platform.profile) {
+        nameInput.value = Platform.profile.name;
+        nameInput.disabled = true;
+      }
+    }).catch(function () {});
+    Platform.loadCloud().then(function (remoteJson) {
+      var remote = Sess.loadProgressRaw(remoteJson);
+      if (remote) {
+        app.progress = remote;
+        Sess.saveProgress(remote); // local cache mirrors the remote doc
+        refreshTitle();
+      }
+      renderNetStatus();
+    }).catch(function () {});
+    app.platformSettingsReady = false;
+    Platform.getSettings().then(function (remote) {
+      app.platformSettingsReady = true;
+      var changed = false;
+      Object.keys(app.settings).forEach(function (k) {
+        if (remote && remote[k] != null && typeof remote[k] === typeof app.settings[k]) { app.settings[k] = remote[k]; changed = true; }
+      });
+      if (changed) {
+        Sess.saveSettings(app.settings);
+        applySettings();
+        bindSettings();
+      }
+    }, function () { app.platformSettingsReady = true; });
+    Platform.loadBindings(DEFAULT_KEYS).then(setBindings).catch(function () {});
+  }
+
+  // Today's board lives on this device (no own-server board).
   function refreshDailyBoard(date) {
     var ol = $('daily-board');
     ol.innerHTML = '';
     Sess.dailyBoard(date).then(function (body) {
-      if (!root.CPPlatform || !root.CPPlatform.hosted) {
-        $('status-net').className = 'net-ok';
-        $('status-net').textContent = 'online';
-      }
       (body.entries || []).forEach(function (e2) {
         ol.appendChild(el('li', '', esc(e2.name) + ' — ' + e2.score + ' pts (' + e2.moves + ' moves' +
           (e2.won ? ', goals complete' : '') + ')'));
       });
-      if (!ol.children.length) ol.appendChild(el('li', '', 'No validated scores yet today.'));
-    }).catch(function () {
-      if (!root.CPPlatform || !root.CPPlatform.hosted) {
-        $('status-net').className = 'net-off';
-        $('status-net').textContent = 'offline';
-      }
-      $('daily-note').textContent = 'Offline: today\'s board is unavailable; your run is still recorded locally.';
+      if (!ol.children.length) ol.appendChild(el('li', '', 'No scores on this device yet today.'));
     });
   }
 
@@ -805,15 +894,14 @@
       : ($('daily-name').value.trim() || 'Guest');
     if (!(Platform && Platform.hosted)) Sess.writeLS('cubepop:name', name);
     var st = app.session.state;
-    $('daily-submit-status').textContent = 'Validating with server…';
     $('btn-daily-submit').disabled = true;
     Sess.submitDaily(name, st.cfg.date, app.session.envelope())
       .then(function (body) {
-        $('daily-submit-status').textContent = 'Accepted — rank #' + body.rank + ' (' + body.score + ' pts, server-validated).';
+        $('daily-submit-status').textContent = 'Saved — rank #' + body.rank + ' on this device (' + body.score + ' pts).';
         refreshDailyBoard(st.cfg.date);
       })
       .catch(function (e) {
-        $('daily-submit-status').textContent = 'Could not submit (' + e.message + '). Score saved locally only.';
+        $('daily-submit-status').textContent = 'Could not save (' + e.message + ').';
       })
       .finally(function () { $('btn-daily-submit').disabled = false; });
   }
@@ -911,35 +999,36 @@
   // ------------------------------------------------------------- input
   function bindGameInput() {
     document.addEventListener('keydown', function (ev) {
+      if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      var action = keyAction[ev.code];
       if (app.state !== 'active') {
-        if (ev.key === 'Escape' && app.state === 'paused') resumeRound();
+        if (action === 'pause' && app.state === 'paused') resumeRound();
         return;
       }
       if ($('overlay-pause').hidden === false || $('overlay-results').hidden === false) return;
       var st = app.session && app.session.state;
-      if (!st) return;
+      if (!st || !action) return;
       var rows = st.grid.length, cols = st.grid[0] ? st.grid[0].length : 0;
-      var k = ev.key;
-      if (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight') {
+      if (action === 'up' || action === 'down' || action === 'left' || action === 'right') {
         ev.preventDefault();
-        var dr = k === 'ArrowUp' ? -1 : k === 'ArrowDown' ? 1 : 0;
-        var dc = k === 'ArrowLeft' ? -1 : k === 'ArrowRight' ? 1 : 0;
+        var dr = action === 'up' ? -1 : action === 'down' ? 1 : 0;
+        var dc = action === 'left' ? -1 : action === 'right' ? 1 : 0;
         setFocus(Math.min(rows - 1, Math.max(0, app.focus.r + dr)),
                  Math.min(cols - 1, Math.max(0, app.focus.c + dc)));
         Audio.select();
         var cell = st.grid[app.focus.r][app.focus.c];
         if (cell) announce('Row ' + (app.focus.r + 1) + ' column ' + (app.focus.c + 1) + ', ' + colorLabel(cell.c).label +
           (cell.s ? ' special' : ', group of ' + Rules.groupAt(st, app.focus.r, app.focus.c).length));
-      } else if (k === 'Enter' || k === ' ') {
+      } else if (action === 'pop') {
         ev.preventDefault();
         tryPop(app.focus.r, app.focus.c);
-      } else if (k === 'h' || k === 'H') {
+      } else if (action === 'hint') {
         ev.preventDefault(); doHint();
-      } else if (k === 'u' || k === 'U') {
+      } else if (action === 'undo') {
         ev.preventDefault(); doUndo();
-      } else if (k === 'p' || k === 'P' || k === 'Escape') {
+      } else if (action === 'pause') {
         ev.preventDefault(); pauseRound();
-      } else if (k === 'c' || k === 'C') {
+      } else if (action === 'camera') {
         if (app.renderer) { app.renderer.resetCamera(); announce('Camera reset.'); }
       }
     });
@@ -1175,33 +1264,29 @@
     }, 1000);
     app.progress = Sess.loadProgress();
 
-    // Platform handshake: token read, remote save wins, account nickname.
+    // Platform handshake: StarHermit.init() reads the launch token; signed in,
+    // the remote save, platform settings and key bindings win.
     var Platform = root.CPPlatform;
     if (Platform) {
       try { Platform.init(); } catch (e) { /* offline */ }
-      if (Platform.hosted) {
-        try { Platform.onSync(renderNetStatus); } catch (e) { /* ok */ }
-        Platform.fetchProfile().then(function () {
-          renderNetStatus();
-          // The account nickname replaces the free-text name on submissions.
-          var nameInput = $('daily-name');
-          if (nameInput && Platform.profile) {
-            nameInput.value = Platform.profile.name;
-            nameInput.disabled = true;
-          }
-        }).catch(function () {});
-        Platform.loadCloud().then(function (remoteJson) {
-          var remote = Sess.loadProgressRaw(remoteJson);
-          if (remote) {
-            app.progress = remote;
-            Sess.saveProgress(remote); // local cache mirrors the remote doc
-            refreshTitle();
-          }
-          renderNetStatus();
-        }).catch(function () {});
-      }
+      Platform.onSync(renderNetStatus);
+      Platform.onAuth(function (signedIn) {
+        renderNetStatus();
+        Sess.syncTime();
+        renderPlatformButtons();
+        var nameInput = $('daily-name');
+        if (nameInput && !signedIn) nameInput.disabled = false;
+        syncFromPlatform();
+      });
+      $('btn-signin').textContent = P_STR.signIn;
+      $('btn-invite').textContent = P_STR.invite;
+      $('btn-signin').addEventListener('click', function () { Platform.signIn(); });
+      $('btn-invite').addEventListener('click', inviteFriend);
+      syncFromPlatform();
       renderNetStatus();
+      renderPlatformButtons();
     }
+    setBindings(DEFAULT_KEYS);
     Audio.setCaptionCallback(function (text) {
       if (!app.settings.captions) return;
       var c = $('captions');

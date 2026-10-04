@@ -49,6 +49,10 @@
         <button class="btn" data-goto="settings">Settings</button>
         <button class="btn" data-goto="help">Help</button>
       </nav>
+      <div class="title-platform" id="title-platform" hidden>
+        <button id="btn-signin" class="btn" hidden>Sign in with StarHermit</button>
+        <button id="btn-invite" class="btn" hidden>Invite a friend</button>
+      </div>
       <p id="title-progress" class="muted"></p>
     </div>
   </section>
@@ -65,7 +69,7 @@
     <h2 id="daily-h">Daily Challenge</h2>
     <div id="daily-info" class="panel"></div>
     <button id="btn-daily-play" class="btn btn-primary">Play today's challenge</button>
-    <h3>Today's board</h3>
+    <h3>Today's board (this device)</h3>
     <ol id="daily-board" class="board-list"></ol>
     <p id="daily-note" class="muted"></p>
     <button class="btn" data-goto="title">Back</button>
@@ -154,12 +158,12 @@
     <table class="controls-table">
       <thead><tr><th>Action</th><th>Keyboard</th><th>Pointer / touch</th></tr></thead>
       <tbody>
-        <tr><td>Move selection</td><td>Arrow keys</td><td>—</td></tr>
-        <tr><td>Pop / fire</td><td>Enter or Space</td><td>Tap a group</td></tr>
-        <tr><td>Hint</td><td>H</td><td>Hint button</td></tr>
-        <tr><td>Undo</td><td>U</td><td>Undo button</td></tr>
-        <tr><td>Pause</td><td>P or Escape</td><td>Pause button</td></tr>
-        <tr><td>Orbit camera</td><td>C resets</td><td>Drag the board</td></tr>
+        <tr><td>Move selection</td><td id="key-move">Arrow keys</td><td>—</td></tr>
+        <tr><td>Pop / fire</td><td id="key-pop">Enter or Space</td><td>Tap a group</td></tr>
+        <tr><td>Hint</td><td id="key-hint">H</td><td>Hint button</td></tr>
+        <tr><td>Undo</td><td id="key-undo">U</td><td>Undo button</td></tr>
+        <tr><td>Pause</td><td id="key-pause">P or Escape</td><td>Pause button</td></tr>
+        <tr><td>Orbit camera</td><td id="key-camera">C resets</td><td>Drag the board</td></tr>
       </tbody>
     </table>
     <button class="btn" data-goto="title">Back</button>
@@ -227,7 +231,7 @@
         <p id="results-ach" class="ach-line"></p>
         <div id="results-daily" hidden>
           <label>Display name <input id="daily-name" maxlength="24"></label>
-          <button id="btn-daily-submit" class="btn">Submit to today's board</button>
+          <button id="btn-daily-submit" class="btn">Save to today's board</button>
           <p id="daily-submit-status" class="muted"></p>
         </div>
         <div class="btn-row">
@@ -267,6 +271,7 @@
 <script src="js/rules.js"></script>
 <script src="js/content.js"></script>
 <script src="js/audio.js"></script>
+<script src="starhermit-sdk.js"></script>
 <script src="js/platform.js"></script>
 <script src="js/session.js?v=production-qa-1"></script>
 <script src="js/gfx.js"></script>

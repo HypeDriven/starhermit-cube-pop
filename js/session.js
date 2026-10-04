@@ -12,7 +12,8 @@
     progress: 'cubepop:progress:v1',
     achievements: 'cubepop:achievements:v1',
     savedRound: 'cubepop:saved-round:v1',
-    dailyBest: 'cubepop:daily-best:v1'
+    dailyBest: 'cubepop:daily-best:v1',
+    dailyBoards: 'cubepop:daily-boards:v1'
   };
 
   // ---------- storage helpers ----------
@@ -85,9 +86,12 @@
     return true;
   }
 
-  // ---------- server time sync ----------
+  // ---------- time sync (signed in only) ----------
+  // GET /api/v1/time only with a StarHermit launch token; standalone play
+  // makes no own-server requests and uses the local clock.
   var timeOffset = 0; // serverNow - clientNow
   function syncTime() {
+    if (!(root.CPPlatform && root.CPPlatform.hosted)) { timeOffset = 0; return Promise.resolve(0); }
     var t0 = Date.now();
     return fetch('/api/v1/time', { headers: apiHeaders() }).then(function (r) {
       if (!r.ok) throw new Error('time ' + r.status);
@@ -255,30 +259,44 @@
     } catch (e) { return null; }
   };
 
-  // ---------- daily leaderboard (own-server validated routes) ----------
   function apiHeaders(extra) {
     var h = extra || {};
     if (root.CPPlatform && typeof root.CPPlatform.headers === 'function')
       return root.CPPlatform.headers(h);
     return h;
   }
-  function submitDaily(name, date, envelope) {
-    return fetch('/api/v1/daily/submit', {
-      method: 'POST', headers: apiHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({
-        name: name, date: date, envelope: envelope,
-        playerId: root.CPPlatform && root.CPPlatform.hosted ? root.CPPlatform.userId : undefined
-      })
-    }).then(function (r) {
-      return r.json().then(function (body) {
-        if (!r.ok) throw new Error(body.error || ('http ' + r.status));
-        return body;
-      });
+
+  // ---------- daily board (local, this device) ----------
+  // { [date]: [{ name, score, moves, won, elapsedMs, invalidCount, at }] }
+  function rankEntries(list) {
+    return list.slice().sort(function (a, b) {
+      return (b.won - a.won) || (b.score - a.score) || (a.invalidCount - b.invalidCount) ||
+        (a.elapsedMs - b.elapsedMs) || (a.at - b.at);
     });
   }
+  function submitDaily(name, date, envelope) {
+    var r = envelope && envelope.result;
+    if (!r || !r.score) return Promise.reject(new Error('round not finished'));
+    var entry = {
+      name: String(name || 'Guest').slice(0, 24), score: r.score.total, moves: r.moves,
+      won: !!r.won, elapsedMs: r.elapsedMs | 0, invalidCount: envelope.invalidCount | 0, at: Date.now()
+    };
+    var boards = readLS(LS.dailyBoards, {});
+    if (!boards || typeof boards !== 'object') boards = {};
+    var prev = (boards[date] || []).filter(function (e) { return e.name === entry.name; })[0];
+    var list = (boards[date] || []).filter(function (e) { return e.name !== entry.name; });
+    // One entry per name per day: keep the better run.
+    list.push(prev && rankEntries([prev, entry])[0] === prev ? prev : entry);
+    boards[date] = rankEntries(list).slice(0, 50);
+    // Keep the last 14 days only.
+    Object.keys(boards).sort().slice(0, -14).forEach(function (d) { delete boards[d]; });
+    writeLS(LS.dailyBoards, boards);
+    var rank = boards[date].findIndex(function (e) { return e.name === entry.name; }) + 1;
+    return Promise.resolve({ ok: true, score: entry.score, rank: rank });
+  }
   function dailyBoard(date) {
-    return fetch('/api/v1/daily/board?date=' + encodeURIComponent(date), { headers: apiHeaders() })
-      .then(function (r) { return r.json(); });
+    var boards = readLS(LS.dailyBoards, {});
+    return Promise.resolve({ date: date, entries: (boards && boards[date]) || [] });
   }
 
   root.CPSession = {

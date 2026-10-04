@@ -255,3 +255,9 @@ body.left-handed #action-tray { flex-direction: row-reverse; }
   .btn { transition: none; }
 }
 body.reduced-motion .btn { transition: none; }
+
+@media (pointer: coarse) {
+  select { min-height: 36px; }
+}
+.title-platform { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 10px; }
+.title-platform[hidden], .title-platform [hidden] { display: none; }

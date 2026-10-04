@@ -4,8 +4,8 @@
  * Drives the real visible UI in headless Chrome (playwright-core + system
  * Chrome), on two viewport passes: desktop 1280x800 and mobile 390x844
  * (touch). Flow per pass:
- *   title → settings (enable reduced motion) → daily screen (offline
- *   fallback note) → Play (journey stage 1 "First Pops") → play the round
+ *   title → settings (enable reduced motion) → daily screen (local
+ *   board) → Play (journey stage 1 "First Pops") → play the round
  *   for real via arrow keys + Enter (same controls a player uses; the
  *   screen-reader mirror grid and live-region announcements are read only
  *   for targeting/synchronization) → exercise Hint/Undo buttons and
@@ -13,11 +13,10 @@
  *   be lost: no move/time limit, free reshuffles) → back to title with
  *   persisted progress.
  *
- * The game talks to the StarHermit backend only for the daily leaderboard
- * and server clock; this test serves the repo with a minimal embedded
- * static server (no API), which exercises the game's offline-capable path.
- * server.js is the StarHermit authoritative script and is intentionally
- * not used here.
+ * This test serves the repo with a minimal embedded static server (no
+ * API). Standalone (no launch token) the game must make zero same-origin
+ * /api or /ws requests; the signed-in pass stubs the platform API and
+ * GET /api/v1/time (the only own-server route, allowed with a token).
  *
  * Run: npm run test:e2e
  */
@@ -57,17 +56,77 @@ function serveStatic() {
 
 const shot = (stage, pass) => `/tmp/cube-pop-e2e-${stage}-${pass}.png`;
 
+// StarHermit routes (the game's own /api/v1/time is separate).
+const PLATFORM_API = /^\/api\/v1\/(games|users|me|leaderboards|chat)\//;
+// Any own-server route: forbidden in a standalone load.
+const OWN_SERVER = /^\/(api|ws)(\/|$)/;
+
+// Signed-in pass: launch token in the fragment, platform API stubbed.
+async function platformPass(browser, passName, contextOpts) {
+  const context = await browser.newContext(contextOpts);
+  const page = await context.newPage();
+  const errors = [], seen = [];
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+  page.on('console', (m) => {
+    if ((m.type() !== 'error' && m.type() !== 'warning') || browserNoise.test(m.text())) return;
+    errors.push(`console: ${m.text()}`);
+  });
+  const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const jwt = `${b64u({ alg: 'none' })}.${b64u({ sub: 'u-e2e-0001', game_scope: 'cube-pop', exp: Math.floor(Date.now() / 1000) + 3600 })}.sig`;
+  await page.route((url) => PLATFORM_API.test(url.pathname), (route) => {
+    const req = route.request(), u = new URL(req.url());
+    seen.push(req.method() + ' ' + u.pathname);
+    const json = (o) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(o) });
+    if (u.pathname.endsWith('/profile')) return json({ nickname: 'Pip Tester' });
+    if (u.pathname.endsWith('/settings') && req.method() === 'GET') return json({ settings: { highContrast: true } });
+    if (u.pathname.endsWith('/controls')) return json({ actions: [{ action: 'hint', codes: ['KeyJ'] }] });
+    return route.fulfill({ status: 204 });
+  });
+  await page.route((url) => url.pathname === '/api/v1/time', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ now: Date.now() }) }));
+  const click = (sel) => (contextOpts.hasTouch ? page.tap(sel) : page.click(sel));
+  const step = async (name, fn) => { await fn(); console.log(`ok - [${passName}] ${name}`); };
+  try {
+    await step('signed in: nickname, save load, fragment stripped', async () => {
+      await page.goto(`http://127.0.0.1:${server.address().port}/#game_token=${jwt}`);
+      await page.waitForFunction(() => /Pip Tester/.test(document.getElementById('status-net').textContent), null, { timeout: 8000 });
+      if (await page.evaluate(() => location.hash)) throw new Error('launch fragment not stripped');
+      if (await page.locator('#btn-signin:visible').count()) throw new Error('sign-in shown while signed in');
+      if (!seen.includes('GET /api/v1/me/cloud-saves/' + encodeURIComponent('game:cube-pop'))) throw new Error('no cloud load: ' + seen.join(', '));
+    });
+    await step('platform settings applied (high contrast)', async () => {
+      await page.waitForFunction(() => JSON.parse(localStorage.getItem('cubepop:settings:v1') || '{}').highContrast === true, null, { timeout: 5000 });
+    });
+    await step('invite a friend shows a confirmation toast', async () => {
+      await page.locator('#btn-invite').scrollIntoViewIfNeeded();
+      await click('#btn-invite');
+      await page.waitForSelector('#toast:not([hidden])', { timeout: 3000 });
+      const box = await page.locator('#toast').boundingBox();
+      if (!box || box.x < 0 || box.x + box.width > contextOpts.viewport.width + 1) throw new Error('toast off-screen ' + JSON.stringify(box));
+      await page.screenshot({ path: shot('platform', passName) });
+    });
+    await step('help lists the platform key binding', async () => {
+      await page.locator('[data-goto="help"]').first().scrollIntoViewIfNeeded();
+      await click('[data-goto="help"]');
+      await page.waitForFunction(() => document.getElementById('key-hint').textContent === 'J', null, { timeout: 3000 });
+    });
+  } finally {
+    await context.close();
+  }
+  return errors;
+}
+
 async function runPass(browser, passName, contextOpts) {
   const context = await browser.newContext(contextOpts);
   const page = await context.newPage();
   const errors = [];
+  page.on('request', (r) => {
+    const u = new URL(r.url());
+    if (u.hostname === '127.0.0.1' && OWN_SERVER.test(u.pathname)) errors.push('standalone made an own-server call: ' + r.url());
+  });
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {
     if ((m.type() !== 'error' && m.type() !== 'warning') || browserNoise.test(m.text())) return;
-    // The game is offline-capable by design: without the StarHermit backend
-    // it probes /api/v1/*, gets 404 from our static server, and degrades
-    // gracefully. Only resource-load 404s for those probes are benign.
-    if (/Failed to load resource/.test(m.text()) && (m.location()?.url || '').includes('/api/v1/')) return;
     errors.push(`console: ${m.text()}`);
   });
 
@@ -154,16 +213,12 @@ async function runPass(browser, passName, contextOpts) {
       await page.waitForSelector('#screen-title:not([hidden])');
     });
 
-    await step('daily screen shows offline fallback (no backend)', async () => {
+    await step('daily screen shows the local board (no backend)', async () => {
       await page.click('#screen-title [data-goto="daily"]');
       await page.waitForSelector('#screen-daily:not([hidden])');
-      await page.waitForFunction(() =>
-        document.getElementById('status-net').textContent === 'offline' ||
-        document.getElementById('status-net').textContent === 'online', null, { timeout: 8000 });
+      await page.waitForFunction(() => /No scores on this device/.test(document.getElementById('daily-board').textContent), null, { timeout: 8000 });
       const net = await page.textContent('#status-net');
-      if (net !== 'offline') throw new Error(`expected offline status without API, got "${net}"`);
-      const note = await page.textContent('#daily-note');
-      if (!/offline/i.test(note)) throw new Error('offline note missing: ' + note);
+      if (net !== 'offline-capable') throw new Error(`expected offline-capable status, got "${net}"`);
       await page.click('#screen-daily [data-goto="title"]');
       await page.waitForSelector('#screen-title:not([hidden])');
     });
@@ -307,7 +362,7 @@ try {
     ['mobile', { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }]
   ]) {
     try {
-      const errs = await runPass(browser, name, opts);
+      const errs = [...await runPass(browser, name, opts), ...await platformPass(browser, 'platform-' + name, opts)];
       allErrors.push(...errs.map((e) => `[${name}] ${e}`));
     } catch (e) {
       console.error(`FAIL - [${name}] ${e.message}`);

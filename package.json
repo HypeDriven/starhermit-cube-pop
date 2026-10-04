@@ -2,7 +2,7 @@
   "name": "cube-pop",
   "private": true,
   "scripts": {
-    "test": "node tests/rules.test.js && node --test tests/gfx.test.js",
+    "test": "node tests/rules.test.js && node --test tests/gfx.test.js tests/platform.test.mjs",
     "test:e2e": "node tests/e2e.mjs"
   },
   "devDependencies": {

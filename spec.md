@@ -1,7 +1,7 @@
 # Cube Pop — Game Design Document (running spec)
 
 **Pitch:** Tap a cluster of matching toy cubes to pop it; pop five to forge a rocket, eight to forge a bomb, and set them off in chains to fill colour quotas on a cheerful 3D toy-studio wall.
-**Genre:** Cluster-pop puzzle (single tap, gravity refill, colour quotas). **Players:** 1, with an asynchronous server-validated daily leaderboard. **Session:** 1–4 minutes per round; 40-stage journey, 6 challenges, 7 lessons, daily seed, endless score chase.
+**Genre:** Cluster-pop puzzle (single tap, gravity refill, colour quotas). **Players:** 1, with a per-device daily board. **Session:** 1–4 minutes per round; 40-stage journey, 6 challenges, 7 lessons, daily seed, endless score chase.
 **Platforms:** Desktop and mobile browsers (Chrome, Safari, Firefox), portrait and landscape, keyboard, mouse, touch and gamepad.
 **Rendering:** Three.js r160 (`vendor/three.module.min.js`, addons under `vendor/three/addons/`, both mapped by an import map) draws an instanced wall of rounded cubes in a lit toy studio; every menu, HUD element and overlay is semantic HTML. A DOM mirror grid makes the board playable without WebGL.
 
@@ -12,15 +12,15 @@
 | `js/rng.js` | mulberry32 PRNG, FNV-1a `hashString`, three derived streams (rules / decor / AV) |
 | `js/rules.js` | Pure deterministic rules engine: `createGame`, `applyCommand`, legality, scoring, hints, hashing, serialisation |
 | `js/content.js` | Versioned content: 6 cube colours, 5 themes, 40 journey stages, 6 challenges, 3 practice presets, score-chase ruleset, daily generator, 7 lessons, 11 achievements |
-| `js/session.js` | Round lifecycle over the engine: command ids, undo stack, replay envelope, stars, localStorage docs, server-time sync, daily submit/board |
+| `js/session.js` | Round lifecycle over the engine: command ids, undo stack, replay envelope, stars, localStorage docs, server-time sync (signed in only), local daily board |
 | `js/audio.js` | WebAudio buses, authored Opus one-shots with synth fallbacks, ambience loop, seeded pentatonic music |
 | `js/render.js` | `BoardRenderer`: studio environment, instanced cubes + charms, special meshes, particles, dust motes, markers, camera, pointer input, graphics settings, post chain, adaptive resolution |
 | `js/gfx.js` | Pure graphics quality model: presets, categories, GPU → preset detection, `resolve`, `presetTier`, `choosePreset`, `describe` |
 | `js/gfx-panel.js` | Settings → Graphics controls, GPU probe, panel strings in nine locales |
 | `js/ui.js` | Screens, HUD, settings, board mirror, keyboard/gamepad, rounds, pause/results, persistence glue; `CPUI.init` |
 | `js/main.js` | ES-module bootstrap: WebGL detection, renderer factory, `CPUI.init` |
-| `server.js` | StarHermit game script: static hosting, `/api/v1/time`, daily board read, daily submit with full replay validation |
-| `data/daily-boards.json` | Server-side ranked daily entries (never served) |
+| `server.js` | StarHermit game script: static hosting, `/api/v1/time` (read by the client only when signed in); its legacy daily board/submit routes are no longer called |
+| `data/daily-boards.json` | Legacy server-side daily entries (unused by the client; never served) |
 | `assets/` | `title-keyart.webp`, `results-banner.webp`, `table-wood.webp`, `toy-rocket.glb` |
 | `sfx/` | 21 Opus clips, `manifest.txt` (canonical), `manifest.json` (generator input), `manifest.md` (generator output) |
 | `tests/rules.test.js` | 37 engine/content unit, property, fuzz and golden tests (`npm test`) |
@@ -37,7 +37,7 @@ Cube Pop is the feeling of sweeping a shelf of toy blocks off a table with one f
 1. **Every tap pops something.** Minimum group is 2, `createGame` and every `applyCommand` call `guaranteeMove` so a legal action always exists, and a deadlocked wall reshuffles itself for free (`rules.js` `guaranteeMove`, event `shuffle`). Rules in: free reshuffles, loose quotas early on. Rules out: "no moves left" losses, boards you have to stare at.
 2. **Big groups forge tools.** Specials are never given, only earned: a 5+ group leaves a rocket on the tapped cube, an 8+ group a bomb, and blasts detonate other specials into chains (`applyCommand`, `detonate`). Rules in: hunting for size, planning where the special lands. Rules out: boosters, purchased power-ups, random specials from refills.
 3. **The wall is a toy, not a screen.** Rounded bevelled cubes with cream charms, a wooden table, a shelf of props, warm key light, plastic pops and marimba stings. Rules in: soft edges, matte plastic, wood, confetti. Rules out: neon, glass, glitch effects, abstract grids.
-4. **One engine, everywhere.** Tutorial fixtures, hints, undo, the client and the leaderboard server all run the same `CPRules` on the same seeds; the daily board only ranks replays that re-simulate to the identical final hash (`server.js` `validateDaily`). Rules in: shareable seeds, replay envelopes, inspectable RNG. Rules out: hidden difficulty tuning, unverifiable scores.
+4. **One engine, everywhere.** Tutorial fixtures, hints, undo and the client all run the same `CPRules` on the same seeds; every round carries a replay envelope that re-simulates to the identical final hash. Rules in: shareable seeds, replay envelopes, inspectable RNG. Rules out: hidden difficulty tuning, unverifiable scores.
 5. **Playable without the picture.** The DOM mirror grid, live regions, captions and a keyboard focus ring are first-class; the 3D view is a lens on the same state. Rules in: labels on every cell, colour + icon + charm redundancy. Rules out: canvas-only controls, hover-only information.
 
 ## 2. Player experience
@@ -83,7 +83,7 @@ Cube Pop is the feeling of sweeping a shelf of toy blocks off a table with one f
 ### Win, lose, stars, ties
 - **Win:** all quotas met (`goals-complete`). **Lose:** `move-limit`, `time-up` or `resigned`. Endless never "wins": it ends when `moveBank − moves ≤ 0`.
 - **Stars** (`Session.stars`): 1 for finishing, +1 if `moves ≤ par.moves`, +1 if `elapsedMs ≤ par.timeSec × 1000`. Journey and challenge stars persist as the best per stage; total stars unlock themes.
-- **Daily leaderboard tie order** (`server.js` `rankEntries`): won before lost, higher score, fewer invalid actions, lower elapsed time, then stable `entryId`.
+- **Daily board tie order** (`CPSession` `rankEntries`, local): won before lost, higher score, fewer invalid actions, lower elapsed time, then stable `entryId`.
 
 ### RNG and seeding
 - Master seed → `RNG.derive(seed, STREAM_RULES)` for the board and refills; `STREAM_DECOR` for the title mosaic; `STREAM_AV` is reserved for audio variants. Same config + same command log ⇒ identical `hashState` (property-tested).
@@ -98,7 +98,7 @@ Cube Pop is the feeling of sweeping a shelf of toy blocks off a table with one f
 | Mode | Screen | Content | Assists | Persists |
 |---|---|---|---|---|
 | Journey | `#screen-journey` | 40 authored stages `j01-j40`; stage N+1 unlocks when N is completed; mastery stages at 10, 20, 30, 40 | undo + hint | `progress.completed`, `progress.stars` |
-| Daily Challenge | `#screen-daily` | One immutable config per UTC day from `dailyConfig(date)`; shows seed, size, colours, limits, countdown to next day, today's server board | undo + hint | `dailyBest[date]`, `progress.dailiesDone`, server entry |
+| Daily Challenge | `#screen-daily` | One immutable config per UTC day from `dailyConfig(date)`; shows seed, size, colours, limits, countdown to next day, today's board on this device | undo + hint | `dailyBest[date]`, `progress.dailiesDone`, `daily-boards` entry |
 | Practice | `#screen-practice` | Casual 6×6/4 colours/no limit; Apprentice 7×7/5/20 moves; Expert 8×8/6/20 moves | undo + hint | nothing ranked |
 | Challenge | `#screen-challenge` | `c1-c6`: 3-colour 14-move; 90 s speed; 9 moves no assists; bombs at 7; rockets at 4 no bombs; move + time limit no assists | per card | `progress.stars` |
 | Score Chase | `#screen-score` | Endless Wall: 8×8, 5 colours, bank of 20 moves +12 per wave, quotas grow `4 + 2×wave` over `min(5, 2 + ⌊wave/3⌋)` colours | none | local top-10 runs |
@@ -195,7 +195,7 @@ Cube Pop is the feeling of sweeping a shelf of toy blocks off a table with one f
 
 ## 9. Localization
 
-**Shipped language:** English only, except the Settings → Graphics panel, whose strings (`js/gfx-panel.js`) ship in en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR and it-IT, chosen from `navigator.languages`. Every string is authored inline in `index.html` (screen copy, settings labels, help table), `js/ui.js` (announcements, toasts, results labels, hint reasons) and `js/content.js` (stage names, intros, lesson text, achievement names). `<html lang="en">` is fixed and there is no language selector.
+**Shipped language:** English only, except the StarHermit strings (top-bar status, sign-in, invite, toasts; table in `js/ui.js`) and the Settings → Graphics panel, whose strings (`js/gfx-panel.js`) ship in en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR and it-IT, chosen from `navigator.languages`. Every string is authored inline in `index.html` (screen copy, settings labels, help table), `js/ui.js` (announcements, toasts, results labels, hint reasons) and `js/content.js` (stage names, intros, lesson text, achievement names). `<html lang="en">` is fixed and there is no language selector.
 **Contract (design intent, see §17):** ship en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR and it-IT from a string table keyed by id, chosen from `navigator.languages` with a settings override; layouts already reserve 30 % expansion (cards wrap, tray wraps, overlay cards scroll, `max-width: 70ch`).
 
 ## 10. Accessibility
@@ -209,28 +209,37 @@ Cube Pop is the feeling of sweeping a shelf of toy blocks off a table with one f
 
 ## 11. StarHermit integration
 
-Manifest `starhermit.txt`: `name=Cube Pop`, `launch=index.html`, `owner=<uuid>`, `server=server.js`, `cover=coverart.png` (conventions per https://wiki.starhermit.com/).
+Manifest `starhermit.txt`: `name=Cube Pop`, `launch=index.html`, `owner=<uuid>`, `server=server.js`, `cover` (conventions per https://wiki.starhermit.com/), plus one `control.<action>=<Code>[+<Code>] | <Label>` line per keyboard action: `up`/`down`/`left`/`right` = arrows, `pop` = Enter+Space, `hint` = KeyH, `undo` = KeyU, `pause` = KeyP+Escape, `camera` = KeyC.
+
+All platform I/O goes through `starhermit-sdk.js` (an unmodified copy of `tools/starhermit-sdk.js`, loaded before `js/platform.js`); `js/platform.js` (`CPPlatform`) is a thin adapter over `window.StarHermit` that keeps the game's API.
+
 **Used:**
-- **Game script** (`server.js`): same-origin `GET /api/v1/time` (server clock; client computes a round-trip-adjusted offset in `Session.syncTime`, UTC shown in the top bar), `GET /api/v1/daily/board?date=` (top 50 ranked entries), `POST /api/v1/daily/submit` (name ≤ 24 chars, date not in the future, envelope re-simulated from the daily seed: schema 1, content version 1, initial and final hash match, no duplicate ids, legal commands, claimed score equal, elapsed ≥ 100 ms per move; 20 requests per IP per minute; one entry per name per day; days can be flagged `excluded`).
-- **Leaderboard:** daily only, server-validated. Offline: casual name entry (`Guest` default). Hosted: submissions and board rows use the account nickname from the platform profile (the name field is read-only).
+- **Game script** (`server.js`): the client reads same-origin `GET /api/v1/time` **only when signed in** (server clock; round-trip-adjusted offset in `Session.syncTime`, UTC shown in the top bar). Standalone (no launch token) the game makes no own-server requests at all and uses the local clock. The legacy `/api/v1/daily/*` routes in `server.js` are not called.
+- **Daily board:** local to the device (`cubepop:daily-boards:v1`, last 14 days, top 50 per day, one entry per name keeping the better run). Signed out: casual name entry (`Guest` default). Signed in: entries use the account nickname (the name field is read-only).
 - **Sessions:** solo and local; the daily is an asynchronous seeded session with a replay envelope (`Session.envelope`: schema, build `1.0.0`, content version, config id, seed, initial hash, ordered commands, periodic hashes every 5 commands, invalid count, assists, result, final hash).
-**Used (hosted):** `js/platform.js` reads `#game_token=<jwt>` from the URL fragment (stripped after the read; query forms for local dev), decodes `sub` + `game_scope` (never hard-coded), sends `Authorization: Bearer` on every call, and re-mints every 45 min via `POST /api/v1/games/{slug}/launch-token` (60 s retry). The top bar shows "Playing as <nickname> · sync status" from `GET /api/v1/users/{sub}/profile` (never usernames, never `/api/v1/me`). The checksummed progress document mirrors to one zip+base64 cloud slot at `GET/PUT /api/v1/me/cloud-saves/{slug}` — remote wins on boot (validated by `CPSession.loadProgressRaw`), saves debounce 2 s and flush on `pagehide`/hidden with keepalive. The own-server validated daily submit/board/time routes keep working as its-backend with graceful fallback, now carrying the account id.
-**Not used:** presence heartbeats, platform achievements (local only), friends filtering, realtime rooms, matchmaking, chat, voice. The client is fully offline-capable: without a token it makes the same local-only calls as before, the top bar shows `offline-capable`, the daily screen shows an offline note and scores are kept locally.
+- **Launch token and sign-in:** `StarHermit.init()` reads `#game_token=` (library) or `#access_token=` (sign-in return), strips it, takes the slug from `game_scope` and renews the token before expiry; if renewal is refused the top bar returns to `offline-capable`, the sign-in button returns and the name field unlocks. On `*.starhermit.com` without a token the title shows "Sign in with StarHermit" (`StarHermit.signIn()`); hidden when signed in or running locally.
+- **Identity:** the top bar shows "Playing as <nickname> · sync status" from `StarHermit.profile()` (nickname, `Player <id>` fallback).
+- **Cloud save:** the checksummed progress document is mirrored with `StarHermit.saveJSON` (2 s debounce) to `/api/v1/me/cloud-saves/game:<slug>`, flushed with keepalive on `pagehide`/hidden; remote wins on boot (`loadJSON`, validated by `CPSession.loadProgressRaw`). localStorage stays the offline cache.
+- **Settings KV:** the whole settings object (volumes, mute, captions, reduced motion, high contrast, large text, left-handed, confirm pop, theme, graphics) is written with `patchSettings` (400 ms debounce) on every change, after the boot read of `getSettings()` has been applied over the local values (platform wins).
+- **Invite link:** when signed in the title shows "Invite a friend": copies `StarHermit.inviteLink()` and confirms with a toast (shows the link if copying is blocked).
+- **Controls:** keydown is routed by `event.code` through `StarHermit.loadBindings(defaults)`; the Help controls table shows the effective keys. No in-game rebinding UI.
+
+**Not used:** platform achievements and platform leaderboards (the game's server reports neither; achievements are local), platform sessions, matchmaking, session invites, chat, replays, realtime rooms, voice — the game is solo and `server.js` is not a platform session script. New platform strings (status, sign-in, invite, toasts) are localized in the nine locales via the Graphics panel's locale picker. Without a token the game makes no StarHermit calls.
 
 ## 12. Technical architecture
 
 - **Module contract:** `rules` is pure (no DOM, no clock, no `Math.random`); `content` is data plus the daily/tutorial generators; `session` is the only writer of rules state on the client and owns ids, undo, snapshots and the envelope; `render` consumes state snapshots and event lists; `ui` owns screens, timers and settings; `audio` owns WebAudio. Script order in `index.html`: import map → rng → rules → content → audio → platform → session → gfx → gfx-panel → ui → main (module). `gfx` is pure (no DOM, no three.js) and shared by the panel and the renderer.
-- **Determinism and replay:** 32-bit mulberry32 with stored `rngState`; quantised `elapsedMs`; `hashState` over a stable-stringified state without `events`; server re-simulation is the acceptance test for daily scores. `tools/validate-content.js` proves legality, reachable goals, no soft locks and bounded duration for every shipped config.
-- **Persistence (localStorage):** `cubepop:settings:v1`, `cubepop:progress:v1` (`v, stars, completed, dailiesDone, totalCubes, sum` — corrupt checksum resets safely), `cubepop:achievements:v1`, `cubepop:saved-round:v1` (config, serialised state, commands, init hash), `cubepop:daily-best:v1`, `cubepop:score-best:v1`, `cubepop:name`. Tutorials are never snapshotted.
+- **Determinism and replay:** 32-bit mulberry32 with stored `rngState`; quantised `elapsedMs`; `hashState` over a stable-stringified state without `events`; `replay` re-simulation verifies envelopes. `tools/validate-content.js` proves legality, reachable goals, no soft locks and bounded duration for every shipped config.
+- **Persistence (localStorage):** `cubepop:settings:v1`, `cubepop:progress:v1` (`v, stars, completed, dailiesDone, totalCubes, sum` — corrupt checksum resets safely), `cubepop:achievements:v1`, `cubepop:saved-round:v1` (config, serialised state, commands, init hash), `cubepop:daily-best:v1`, `cubepop:daily-boards:v1`, `cubepop:score-best:v1`, `cubepop:name`. Tutorials are never snapshotted.
 - **Rendering budget:** one `InstancedMesh` per colour for cubes and one for charms (≤ 64 instances each), ≤ 12 special groups, 80 pooled marker quads, one 2048-point particle buffer, ≤ 25 environment meshes, one 70-point mote cloud: about 35 draw calls. Rendering stops while the tab is hidden. The drawing buffer follows the container's size every frame, so layout changes never crop the wall.
 - **Resilience:** WebGL absent → compatibility card and grid mode; context lost → alert and grid mode with the round intact; missing images hide themselves (`onerror`), missing texture keeps the flat colour, missing clip keeps the synth cue; API failure keeps the game playable.
-- **E2E automation:** `tests/e2e.mjs` serves the repo with an embedded static server (no API), launches system Chrome via `playwright-core`, and for desktop (1280×800) and mobile (390×844, touch) clicks the real buttons: settings → reduced motion, daily screen offline note, Play, keyboard pops chosen by reading the mirror grid, Undo, Hint, Pause/Resume, plays stage 1 to the results card, returns to the title and checks persisted progress. A Graphics step picks Low then High, overrides bloom, turns on the frame rate, reloads and checks everything persisted, then returns to Auto (Low on the software GPU) and confirms the studio canvas renders at Low; a last step plays a round at Ultra. Any console error, warning or page error fails the run.
+- **E2E automation:** `tests/e2e.mjs` serves the repo with an embedded static server (no API), launches system Chrome via `playwright-core`, and for desktop (1280×800) and mobile (390×844, touch) clicks the real buttons: settings → reduced motion, daily screen local board, Play, keyboard pops chosen by reading the mirror grid, Undo, Hint, Pause/Resume, plays stage 1 to the results card, returns to the title and checks persisted progress. A Graphics step picks Low then High, overrides bloom, turns on the frame rate, reloads and checks everything persisted, then returns to Auto (Low on the software GPU) and confirms the studio canvas renders at Low; a last step plays a round at Ultra. Any console error, warning or page error fails the run.
 
 ## 13. Testing and acceptance criteria
 
-`npm test` runs `tests/rules.test.js` (37 tests) and `tests/gfx.test.js` (GPU detection, auto/explicit presets, overrides, scale clamp, preset clears overrides, cost summary). Rules tests cover: deterministic creation; fresh boards always have a move; group detection; every rejection reason; pop/goal/refill; monotonic tick; gravity; rocket at 5+, column orientation, bomb at 8+; row-rocket and bomb blast shapes; chains; specials never join groups; win bonuses; move, time and resign losses; reshuffle guard; endless banking; hint preferences; serialisation round-trip; replay property (same log ⇒ same hashes); failed commands never mutate; malformed-command fuzz; 200-seed random-play fuzz (no NaN, no dead states); all 40 journey stages well-formed and the first five greedy-winnable; challenges/practice/score chase well-formed; daily determinism; lesson fixtures legal and goals reachable; golden outcome hash; interrupted + resumed equals continuous play; tick expiry.
+`npm test` runs `tests/rules.test.js` (37 tests), `tests/platform.test.mjs` (SDK + adapter in a vm sandbox with stubbed `fetch` and launch hash: token read and fragment strip, profile nickname, `game:<slug>` cloud-save round-trip, debounced settings patch, binding overrides, invite link, zero fetches standalone) and `tests/gfx.test.js` (GPU detection, auto/explicit presets, overrides, scale clamp, preset clears overrides, cost summary). Rules tests cover: deterministic creation; fresh boards always have a move; group detection; every rejection reason; pop/goal/refill; monotonic tick; gravity; rocket at 5+, column orientation, bomb at 8+; row-rocket and bomb blast shapes; chains; specials never join groups; win bonuses; move, time and resign losses; reshuffle guard; endless banking; hint preferences; serialisation round-trip; replay property (same log ⇒ same hashes); failed commands never mutate; malformed-command fuzz; 200-seed random-play fuzz (no NaN, no dead states); all 40 journey stages well-formed and the first five greedy-winnable; challenges/practice/score chase well-formed; daily determinism; lesson fixtures legal and goals reachable; golden outcome hash; interrupted + resumed equals continuous play; tick expiry.
 
-`npm run test:e2e` passes when both viewport passes complete every step above with zero console errors. `node tools/smoke-server.js` boots `server.js`, plays a daily round, submits the envelope and reads back the board.
+`npm run test:e2e` passes when both viewport passes complete every step above with zero console errors and zero same-origin `/api` or `/ws` requests, and a signed-in pass per viewport (platform API stubbed) shows the nickname, loads the `game:cube-pop` save, strips the fragment, applies a platform setting, shows the Invite a friend toast on-screen and lists a platform key binding in Help. `node tools/smoke-server.js` boots `server.js`, plays a daily round, submits the envelope and reads back the board.
 
 QA bar (agents/qa.md) as checkable statements: (1) a new player sees instructions in the first stage intro, the Learn lessons and Help before any mechanic is required; (2) every mode, setting, overlay and button is reachable and works in the browser at 1280×800 and 390×844; (3) no console errors or warnings during a full playthrough; (4) no text or control is cut off on desktop, portrait or landscape mobile; (5) daily scores go through the StarHermit game script.
 
@@ -261,7 +270,7 @@ QA bar (agents/qa.md) as checkable statements: (1) a new player sees instruction
 - Score Chase seeds are `Math.random()`: runs are replayable from the envelope but not shareable by seed; its best list is local only.
 - Achievements and progress are localStorage only; clearing site data loses them.
 - The ambience bed first plays from the second round of a session (the clip decodes during the first round while the synth hum runs).
-- `tests/e2e.mjs` cannot exercise daily submission (it serves without the API); that path is covered by `tools/smoke-server.js` instead.
+- `tests/e2e.mjs` does not play a daily round, so saving to the local daily board is untested end to end.
 - `assets/toy-rocket.glb` ships unused.
 
 ## 17. Design intent not yet implemented
