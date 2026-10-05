@@ -905,7 +905,8 @@ export class BoardRenderer {
   // Pixel ratio = min(dpr, preset cap) × preset/user scale × adaptive scale.
   _syncSize(w, h, force) {
     const g = this.q;
-    const ratio = Math.min(window.devicePixelRatio || 1, g.dprCap) * g.scale * this.adaptiveScale;
+    // × UIScale: the canvas sits inside the zoomed #main, so its backing store must cover the zoom.
+    const ratio = Math.min(window.devicePixelRatio || 1, g.dprCap) * ((window.UIScale && UIScale.value) || 1) * g.scale * this.adaptiveScale;
     if (force || w !== this.size[0] || h !== this.size[1] || ratio !== this.pixelRatio) {
       const resized = w !== this.size[0] || h !== this.size[1];
       this.size = [w, h];

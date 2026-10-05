@@ -1159,7 +1159,7 @@
     if (!cv || !cv.getContext) return;
     var g = cv.getContext('2d');
     if (!g) return;
-    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var dpr = Math.min(window.devicePixelRatio || 1, 2) * ((root.UIScale && root.UIScale.value) || 1);
     var w = cv.clientWidth || 600, h = cv.clientHeight || 260;
     cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
     g.scale(dpr, dpr);
