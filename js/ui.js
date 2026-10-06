@@ -88,12 +88,22 @@
     document.body.dataset.gameState = next;
   }
 
+  // Dialogs open at their top (heading visible) whatever the focused button.
+  function resetScroll(root) {
+    root.scrollTop = 0;
+    root.querySelectorAll('*').forEach(function (e) { if (e.scrollTop) e.scrollTop = 0; });
+  }
+
   function showScreen(name) {
     document.querySelectorAll('.screen').forEach(function (s) { s.hidden = s.dataset.screen !== name; });
     var scr = document.querySelector('[data-screen="' + name + '"]');
     if (scr) {
       var h = scr.querySelector('h2, h3, button');
-      if (h) h.focus && h.focus();
+      if (h) h.focus && h.focus({ preventScroll: true });
+      // A new screen opens at its top, not at the scroll the previous one left.
+      var main = $('main');
+      if (main) main.scrollTop = 0;
+      scr.scrollTop = 0;
     }
     if (name !== 'game') setState(name === 'title' ? 'title' : 'mode-select', 'show-screen');
   }
@@ -884,7 +894,8 @@
 
     $('replay-json').textContent = JSON.stringify(app.session.envelope());
     $('btn-results-next').hidden = !(app.currentList === 'journey' && app.currentIdx < Content.JOURNEY.length - 1);
-    $('btn-results-retry').focus();
+    $('btn-results-retry').focus({ preventScroll: true });
+    resetScroll($('overlay-results'));
   }
 
   function submitDailyScore() {
@@ -927,7 +938,8 @@
     $('replay-json').textContent = JSON.stringify(app.session.envelope());
     var lessons = Content.tutorialLessons();
     $('btn-results-next').hidden = app.currentIdx >= lessons.length - 1;
-    $('btn-results-retry').focus();
+    $('btn-results-retry').focus({ preventScroll: true });
+    resetScroll($('overlay-results'));
   }
 
   // ------------------------------------------------------------- pause
@@ -937,7 +949,8 @@
     app.pausedAt = performance.now();
     app.lastFocusEl = document.activeElement;
     $('overlay-pause').hidden = false;
-    $('btn-resume-round').focus();
+    $('btn-resume-round').focus({ preventScroll: true });
+    resetScroll($('overlay-pause'));
     // Tutorial lessons are short and restartable; leaving them never saves a
     // snapshot (see leaveRound), so pausing shouldn't either — a resumed
     // session would lack its lesson object and could never complete.
