@@ -102,7 +102,7 @@ async function platformPass(browser, passName, contextOpts) {
       await click('#btn-invite');
       await page.waitForSelector('#toast:not([hidden])', { timeout: 3000 });
       const box = await page.locator('#toast').boundingBox();
-      if (!box || box.x < 0 || box.x + box.width > contextOpts.viewport.width + 1) throw new Error('toast off-screen ' + JSON.stringify(box));
+      if (!box || box.x < 0 || box.x + box.width > page.viewportSize().width + 1) throw new Error('toast off-screen ' + JSON.stringify(box));
       await page.screenshot({ path: shot('platform', passName) });
     });
     await step('help lists the platform key binding', async () => {
