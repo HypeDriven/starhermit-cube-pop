@@ -19,7 +19,8 @@
 | `js/gfx-panel.js` | Settings → Graphics controls, GPU probe, panel strings in nine locales |
 | `js/ui.js` | Screens, HUD, settings, board mirror, keyboard/gamepad, rounds, pause/results, persistence glue; `CPUI.init` |
 | `js/main.js` | ES-module bootstrap: WebGL detection, renderer factory, `CPUI.init` |
-| `server.js` | StarHermit game script: static hosting, `/api/v1/time` (read by the client only when signed in); its legacy daily board/submit routes are no longer called |
+| `score-script.js` | StarHermit platform script (`server=`): range-checks a finished round's total and posts it to the `high-score` leaderboard (canonical copy in the games repo's `tools/score-script.js`) |
+| `server.js` | Local dev server: static hosting, `/api/v1/time` (read by the client only when signed in); its legacy daily board/submit routes are no longer called |
 | `data/daily-boards.json` | Legacy server-side daily entries (unused by the client; never served) |
 | `assets/` | `title-keyart.webp`, `results-banner.webp`, `table-wood.webp`, `toy-rocket.glb` |
 | `sfx/` | 21 Opus clips, `manifest.txt` (canonical), `manifest.json` (generator input), `manifest.md` (generator output) |
@@ -210,7 +211,7 @@ Cube Pop is the feeling of sweeping a shelf of toy blocks off a table with one f
 
 ## 11. StarHermit integration
 
-Manifest `starhermit.txt`: `name=Cube Pop`, `launch=index.html`, `owner=<uuid>`, `server=server.js`, `cover` (conventions per https://wiki.starhermit.com/), plus one `control.<action>=<Code>[+<Code>] | <Label>` line per keyboard action: `up`/`down`/`left`/`right` = arrows, `pop` = Enter+Space, `hint` = KeyH, `undo` = KeyU, `pause` = KeyP+Escape, `camera` = KeyC.
+Manifest `starhermit.txt`: `name=Cube Pop`, `launch=index.html`, `owner=<uuid>`, `server=score-script.js`, `cover` (conventions per https://wiki.starhermit.com/), plus one `control.<action>=<Code>[+<Code>] | <Label>` line per keyboard action: `up`/`down`/`left`/`right` = arrows, `pop` = Enter+Space, `hint` = KeyH, `undo` = KeyU, `pause` = KeyP+Escape, `camera` = KeyC.
 
 All platform I/O goes through `starhermit-sdk.js` (an unmodified copy of `tools/starhermit-sdk.js`, loaded before `js/platform.js`); `js/platform.js` (`CPPlatform`) is a thin adapter over `window.StarHermit` that keeps the game's API.
 
@@ -225,7 +226,9 @@ All platform I/O goes through `starhermit-sdk.js` (an unmodified copy of `tools/
 - **Invite link:** when signed in the title shows "Invite a friend": copies `StarHermit.inviteLink()` and confirms with a toast (shows the link if copying is blocked).
 - **Controls:** keydown is routed by `event.code` through `StarHermit.loadBindings(defaults)`; the Help controls table shows the effective keys. No in-game rebinding UI.
 
-**Not used:** platform achievements and platform leaderboards (the game's server reports neither; achievements are local), platform sessions, matchmaking, session invites, chat, replays, realtime rooms, voice — the game is solo and `server.js` is not a platform session script. New platform strings (status, sign-in, invite, toasts) are localized in the nine locales via the Graphics panel's locale picker. Without a token the game makes no StarHermit calls.
+**Leaderboard:** when signed in, every finished round posts its total through `StarHermit.submitScores` (a practice session whose `score-script.js` posts it to the `high-score` board, integer, higher is better, 0–1,000,000), and the results screen shows "Leaderboard rank: #N". Lessons post nothing. Standalone play posts nothing.
+
+**Not used:** platform achievements (achievements are local), matchmaking, matchmaking, session invites, chat, replays, realtime rooms, voice — the game is solo and `server.js` is not a platform session script. New platform strings (status, sign-in, invite, toasts) are localized in the nine locales via the Graphics panel's locale picker. Without a token the game makes no StarHermit calls.
 
 ## 12. Technical architecture
 

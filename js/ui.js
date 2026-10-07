@@ -838,6 +838,19 @@
     return false;
   }
 
+  // Hosted play only: post the round total and show the player's board rank.
+  function postToLeaderboard(total) {
+    var line = $('results-lb');
+    if (!line) return;
+    if (!window.CPPlatform || !CPPlatform.hosted) { line.hidden = true; return; }
+    line.hidden = false;
+    line.textContent = 'Posting score to the leaderboard…';
+    CPPlatform.submitScore(total).then(function (r) {
+      line.textContent = !r.posted ? 'Score not posted to the leaderboard.'
+        : r.rank ? 'Leaderboard rank: #' + r.rank : 'Score posted to the leaderboard.';
+    });
+  }
+
   function showResults(won) {
     var st = app.session.state;
     var ov = $('overlay-results');
@@ -882,6 +895,7 @@
     var stars = app.session.stars();
     $('results-stars').textContent = won && stars ? '★'.repeat(stars) + '☆'.repeat(3 - stars) : '';
     $('results-ach').textContent = '';
+    postToLeaderboard(sc.total);
 
     // daily submission
     var dailyBox = $('results-daily');
@@ -934,6 +948,7 @@
     $('results-breakdown').querySelector('tbody').innerHTML = '';
     $('results-stars').textContent = '';
     $('results-ach').textContent = '';
+    $('results-lb').hidden = true;
     $('results-daily').hidden = true;
     $('replay-json').textContent = JSON.stringify(app.session.envelope());
     var lessons = Content.tutorialLessons();
