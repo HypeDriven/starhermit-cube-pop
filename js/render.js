@@ -1070,9 +1070,9 @@ export class BoardRenderer {
       if (this.postFailed) this.postKey = this._postKey(this.size[0], this.size[1]);
     }
     if (this.composer) {
-      try { this.composer.render(dt); }
-      catch (err) { this.postFailed = true; this.composer = null; this.renderer.render(this.scene, this.camera); }
-    } else this.renderer.render(this.scene, this.camera);
+      try { (globalThis.GameOptions ? globalThis.GameOptions.draw(this.composer.renderer, () => this.composer.render(dt)) : this.composer.render(dt)); }
+      catch (err) { this.postFailed = true; this.composer = null; (globalThis.GameOptions ? globalThis.GameOptions.draw(this.renderer, () => this.renderer.render(this.scene, this.camera)) : this.renderer.render(this.scene, this.camera)); }
+    } else (globalThis.GameOptions ? globalThis.GameOptions.draw(this.renderer, () => this.renderer.render(this.scene, this.camera)) : this.renderer.render(this.scene, this.camera));
   }
 
   dispose() {

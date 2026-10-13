@@ -53,7 +53,7 @@
     if (!ctx) return false;
     var entry = sampleCache[name];
     if (!entry || !entry.buffer) { loadSample(name); return false; }
-    var src = ctx.createBufferSource();
+    var src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createBufferSource(), name) : ctx.createBufferSource());
     src.buffer = entry.buffer;
     src.connect(buses.effects);
     src.start();
@@ -68,12 +68,12 @@
     var master = ctx.createGain();
     master.gain.value = 1;
     master.connect(ctx.destination);
-    buses._master = master;
+    buses._master = (globalThis.GameOptions ? globalThis.GameOptions.tagBus(master, "_master") : master);
     ['music', 'effects', 'ambience'].forEach(function (b) {
       var g = ctx.createGain();
       g.gain.value = muted ? 0 : volumes[b];
       g.connect(master);
-      buses[b] = g;
+      buses[b] = (globalThis.GameOptions ? globalThis.GameOptions.tagBus(g, b) : g);
     });
     return true;
   }
@@ -92,7 +92,7 @@
   function blip(bus, freq, dur, type, gain, slideTo) {
     if (!ensureCtx()) return;
     var t = ctx.currentTime;
-    var o = ctx.createOscillator(), g = ctx.createGain();
+    var o = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createOscillator(), bus) : ctx.createOscillator()), g = ctx.createGain();
     o.type = type || 'sine';
     o.frequency.setValueAtTime(freq, t);
     if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(1, slideTo), t + dur);
@@ -109,7 +109,7 @@
     var buf = ctx.createBuffer(1, len, ctx.sampleRate);
     var d = buf.getChannelData(0);
     for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-    var src = ctx.createBufferSource(); src.buffer = buf;
+    var src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createBufferSource(), bus) : ctx.createBufferSource()); src.buffer = buf;
     var f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = filterFreq || 1200;
     var g = ctx.createGain(); g.gain.value = gain || 0.3;
     src.connect(f); f.connect(g); g.connect(buses[bus]);
@@ -251,15 +251,15 @@
       // once decoded; until then (or if it fails) the synth hum below runs.
       var bed = sampleCache[EVENT_SAMPLES.ambience];
       if (bed && bed.buffer) {
-        var src = ctx.createBufferSource(); src.buffer = bed.buffer; src.loop = true;
+        var src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createBufferSource(), null) : ctx.createBufferSource()); src.buffer = bed.buffer; src.loop = true;
         var bg = ctx.createGain(); bg.gain.value = 0.35;
         src.connect(bg); bg.connect(buses.ambience); src.start();
         ambienceNodes = [src, bg];
         return;
       }
       loadSample(EVENT_SAMPLES.ambience);
-      var o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 88;
-      var o2 = ctx.createOscillator(); o2.type = 'sine'; o2.frequency.value = 132.5;
+      var o = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createOscillator(), null) : ctx.createOscillator()); o.type = 'sine'; o.frequency.value = 88;
+      var o2 = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createOscillator(), null) : ctx.createOscillator()); o2.type = 'sine'; o2.frequency.value = 132.5;
       var g = ctx.createGain(); g.gain.value = 0.05;
       o.connect(g); o2.connect(g); g.connect(buses.ambience);
       o.start(); o2.start();
