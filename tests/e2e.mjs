@@ -65,7 +65,8 @@ const OWN_SERVER = /^\/(api|ws)(\/|$)/;
 async function platformPass(browser, passName, contextOpts) {
   const context = await browser.newContext(contextOpts);
   const page = await context.newPage();
-  const errors = [], seen = [];
+  const errors = [], seen = [], bodies = {};
+  let prefLang = 'en';
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {
     if ((m.type() !== 'error' && m.type() !== 'warning') || browserNoise.test(m.text())) return;
@@ -76,8 +77,16 @@ async function platformPass(browser, passName, contextOpts) {
   await page.route((url) => PLATFORM_API.test(url.pathname), (route) => {
     const req = route.request(), u = new URL(req.url());
     seen.push(req.method() + ' ' + u.pathname);
-    const json = (o) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(o) });
+    if (req.method() !== 'GET') bodies[req.method() + ' ' + u.pathname] = req.postData();
+    const json = (o, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(o) });
     if (u.pathname.endsWith('/profile')) return json({ nickname: 'Pip Tester' });
+    if (u.pathname === '/api/v1/me/language') return json({ preferredLanguage: prefLang });
+    if (u.pathname.includes('/cloud-saves/')) {
+      if (req.method() === 'PUT') return json({ etag: '"v' + seen.length + '"' });
+      return route.fulfill({ status: 204 });
+    }
+    if (/\/settings\/ui\.language$/.test(u.pathname) && req.method() === 'PUT') return json({ key: 'ui.language' });
+    if (u.pathname.endsWith('/reports') && req.method() === 'POST') return json({ id: 'r1', kind: 'bug', status: 'open', createdAt: new Date().toISOString() }, 201);
     if (u.pathname.endsWith('/settings') && req.method() === 'GET') return json({ settings: { highContrast: true } });
     if (u.pathname.endsWith('/controls')) return json({ actions: [{ action: 'hint', codes: ['KeyJ'] }] });
     return route.fulfill({ status: 204 });
@@ -109,6 +118,60 @@ async function platformPass(browser, passName, contextOpts) {
       await page.locator('[data-goto="help"]').first().scrollIntoViewIfNeeded();
       await click('[data-goto="help"]');
       await page.waitForFunction(() => document.getElementById('key-hint').textContent === 'J', null, { timeout: 3000 });
+    });
+    await step('language: Automatic follows the account (fr-CA); Deutsch re-renders and saves ui.language; report a problem', async () => {
+      prefLang = 'fr-CA';
+      await page.goto('about:blank');
+      await page.goto(`http://127.0.0.1:${server.address().port}/#game_token=${jwt}`);
+      await page.waitForFunction(() => document.documentElement.lang === 'fr-CA', null, { timeout: 8000 });
+      if ((await page.locator('[data-goto="journey"]').first().textContent()) !== 'Voyage') throw new Error('title not in fr-CA');
+      await page.locator('#screen-title [data-goto="settings"]').scrollIntoViewIfNeeded();
+      await click('#screen-title [data-goto="settings"]');
+      const choice = page.locator('[data-game-language="choice"]');
+      await choice.waitFor({ timeout: 5000 });
+      await choice.scrollIntoViewIfNeeded();
+      const auto = await choice.locator('option').first().textContent();
+      if (auto !== 'Automatique — Français (Canada)') throw new Error('Automatic label: ' + auto);
+      await choice.selectOption('de-DE');
+      await page.waitForFunction(() => document.documentElement.lang === 'de-DE');
+      await page.waitForFunction(() => /Im Konto gespeichert/.test(document.querySelector('[data-game-language="status"]').textContent), null, { timeout: 5000 });
+      const de = await page.evaluate(() => ({
+        h: document.getElementById('set-h').textContent,
+        reduced: document.querySelector('#set-reduced-motion + span').textContent,
+        gfx: document.querySelector('#gfx-settings legend').textContent,
+        menu: document.querySelector('#screen-title [data-goto="journey"]').textContent,
+        stillThere: !!document.querySelector('[data-game-language="choice"]'),
+      }));
+      if (de.h !== 'Einstellungen' || de.reduced !== 'Weniger Bewegung' || de.gfx !== 'Grafik' || de.menu !== 'Reise' || !de.stillThere) throw new Error('not re-rendered: ' + JSON.stringify(de));
+      const saved = bodies['PUT /api/v1/games/cube-pop/settings/ui.language'];
+      if (!saved || JSON.parse(saved).value.choice !== 'de-DE') throw new Error('ui.language not saved: ' + saved);
+      await page.locator('[data-game-report="title"]').scrollIntoViewIfNeeded();
+      await page.fill('[data-game-report="title"]', 'Language test report');
+      await click('[data-game-report="send"]');
+      await page.waitForFunction(() => /Danke/.test(document.querySelector('[data-game-report="status"]').textContent), null, { timeout: 5000 });
+      if (JSON.parse(bodies['POST /api/v1/games/cube-pop/reports'] || '{}').kind !== 'bug') throw new Error('report not posted');
+      await page.screenshot({ path: shot('language-de', passName), fullPage: false });
+      if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw new Error('German settings overflow horizontally');
+    });
+    await step('language: switching mid-round re-renders the HUD and keeps the round', async () => {
+      await page.locator('#screen-settings [data-goto="title"]').scrollIntoViewIfNeeded();
+      await click('#screen-settings [data-goto="title"]');
+      await click('#btn-play');
+      await page.waitForFunction(() => document.body.dataset.gameState === 'active', null, { timeout: 10000 });
+      await click('#btn-pause');
+      await click('#btn-pause-settings');
+      const choice = page.locator('[data-game-language="choice"]');
+      await choice.scrollIntoViewIfNeeded();
+      await choice.selectOption('it-IT');
+      await page.waitForFunction(() => document.documentElement.lang === 'it-IT');
+      const it = await page.evaluate(() => ({
+        score: document.querySelector('#rail-right .hud-stat span').textContent,
+        goals: document.getElementById('goal-list').textContent,
+        state: document.body.dataset.gameState,
+      }));
+      if (it.score !== 'Punti' || !/Ciliegia|Limone|Foglia|Cielo/.test(it.goals)) throw new Error('HUD not re-rendered: ' + JSON.stringify(it));
+      await choice.selectOption('auto');
+      await page.waitForFunction(() => document.documentElement.lang === 'fr-CA');
     });
   } finally {
     await context.close();

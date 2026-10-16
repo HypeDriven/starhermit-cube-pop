@@ -16,14 +16,23 @@ const JWT = `${b64u({ alg: 'none' })}.${b64u({ sub: 'u-12345678', game_scope: SL
 
 function boot(hash) {
   const calls = [];
-  const store = { save: null, settings: {} };
+  const store = { save: null, settings: {}, version: 0, etag: null };
   const fetch = async (url, init = {}) => {
     const method = init.method || 'GET';
     calls.push({ url, method, init });
     const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json' } });
     if (url.endsWith('/api/v1/users/u-12345678/profile')) return json({ nickname: 'Pip' });
     if (url.includes('/api/v1/me/cloud-saves/')) {
-      if (method === 'PUT') { store.save = Buffer.from(JSON.parse(init.body).dataBase64, 'base64'); return new Response(null, { status: 204 }); }
+      // Conditional writes: the SDK sends If-Match with the ETag it last saw;
+      // a newer save from "another device" (store.etag bumped) answers 412.
+      if (url.endsWith('/info')) return json({ exists: !!store.save, etag: store.etag });
+      if (method === 'PUT') {
+        const ifMatch = init.headers && init.headers['If-Match'];
+        if (ifMatch && ifMatch !== store.etag) return json({ error: 'precondition_failed', etag: store.etag }, 412);
+        store.save = Buffer.from(JSON.parse(init.body).dataBase64, 'base64');
+        store.etag = '"v' + (++store.version) + '"';
+        return json({ etag: store.etag });
+      }
       return store.save ? new Response(store.save, { status: 200 }) : new Response('', { status: 404 });
     }
     if (url.endsWith(`/api/v1/games/${SLUG}/settings`)) {
@@ -80,6 +89,38 @@ test('cloud save round-trips through /api/v1/me/cloud-saves/game:<slug>', async 
   assert.equal(put.init.keepalive, true);
   assert.equal(P.sync, 'synced');
   assert.equal(await P.loadCloud(), wrapped);
+});
+
+test('a lost cloud write (412) is reported as a save conflict and cleared by a reload', async () => {
+  const { P, store } = boot('#game_token=' + JWT);
+  P.init();
+  let conflicts = 0;
+  P.onSaveConflict(() => conflicts++);
+  assert.equal(await P.loadCloud(), null);
+  P.onProgressSave(JSON.stringify({ v: 1, stars: { j01: 1 } }));
+  assert.equal(await P.flushSave(true), true);
+  store.etag = '"elsewhere"'; // another device saved since
+  P.onProgressSave(JSON.stringify({ v: 1, stars: { j01: 2 } }));
+  assert.equal(await P.flushSave(true), false);
+  assert.equal(conflicts, 1);
+  assert.equal(P.saveConflicted(), true);
+  await P.loadCloud();
+  assert.equal(P.saveConflicted(), false);
+});
+
+test('mergeProgress keeps the better side of every record', () => {
+  const ctx = { console };
+  ctx.self = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(readFileSync(path.join(ROOT, 'js', 'rng.js'), 'utf8'), ctx);
+  vm.runInContext(readFileSync(path.join(ROOT, 'js', 'session.js'), 'utf8'), ctx);
+  const m = ctx.CPSession.mergeProgress(
+    { v: 1, stars: { j01: 3, j02: 1 }, completed: { j01: true, j02: true }, dailiesDone: { '2026-10-01': true }, totalCubes: 400 },
+    { v: 1, stars: { j02: 2, j03: 1 }, completed: { j03: true, t1: true }, dailiesDone: { '2026-10-02': true }, totalCubes: 500 });
+  assert.deepEqual(J(m.stars), { j01: 3, j02: 2, j03: 1 });
+  assert.deepEqual(Object.keys(m.completed).sort(), ['j01', 'j02', 'j03', 't1']);
+  assert.deepEqual(Object.keys(m.dailiesDone).sort(), ['2026-10-01', '2026-10-02']);
+  assert.equal(m.totalCubes, 500);
 });
 
 test('settings patch and bindings use the game routes', async () => {

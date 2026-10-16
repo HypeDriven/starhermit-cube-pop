@@ -1,6 +1,6 @@
 /* Cube Pop — Graphics settings panel: GPU probe, localized strings and the
  * controls inside Settings → Graphics. The game ships English only; these
- * panel strings follow navigator.languages across the nine target locales.
+ * panel strings follow the game language across the nine target locales.
  * Depends on window.CPGfx. Exposes window.CPGfxPanel.
  */
 (function (root) {
@@ -158,7 +158,8 @@
    * `set(obj)` stores it and applies it, `info()` returns renderer info or null.
    */
   function bind(get, set, info) {
-    locale = pickLocale(navigator.languages || [navigator.language]);
+    // The panel follows the game language (js/i18n.js: Settings → Language).
+    locale = root.CPI18n ? root.CPI18n.lang : pickLocale(navigator.languages || [navigator.language]);
     var p = probe();
     var box = $('gfx-settings');
     if (!box) return;

@@ -71,6 +71,24 @@
     if (root.CPPlatform && typeof root.CPPlatform.onProgressSave === 'function')
       root.CPPlatform.onProgressSave(JSON.stringify(p)); // mirror to the cloud slot
   }
+  // Merge two progress docs after a cloud-save conflict: the better star count
+  // per stage, every completion and daily from either side, the larger cube
+  // total. Nothing earned on either device is lost.
+  function mergeProgress(remote, local) {
+    var a = remote || {}, b = local || {};
+    function obj(x) { return x && typeof x === 'object' ? x : {}; }
+    var out = { v: 1, stars: {}, completed: {}, dailiesDone: {}, totalCubes: Math.max(+a.totalCubes || 0, +b.totalCubes || 0) };
+    [obj(a.stars), obj(b.stars)].forEach(function (m) {
+      Object.keys(m).forEach(function (k) { out.stars[k] = Math.max(out.stars[k] || 0, +m[k] || 0); });
+    });
+    [obj(a.completed), obj(b.completed)].forEach(function (m) {
+      Object.keys(m).forEach(function (k) { if (m[k]) out.completed[k] = true; });
+    });
+    [obj(a.dailiesDone), obj(b.dailiesDone)].forEach(function (m) {
+      Object.keys(m).forEach(function (k) { if (m[k]) out.dailiesDone[k] = true; });
+    });
+    return out;
+  }
   function totalStars(p) {
     var n = 0; for (var k in p.stars) n += p.stars[k];
     return n;
@@ -304,7 +322,7 @@
     Session: Session,
     loadSettings: loadSettings, saveSettings: saveSettings,
     loadProgress: loadProgress, loadProgressRaw: loadProgressRaw,
-    saveProgress: saveProgress, totalStars: totalStars,
+    saveProgress: saveProgress, totalStars: totalStars, mergeProgress: mergeProgress,
     loadAchievements: loadAchievements, unlockAchievement: unlockAchievement,
     syncTime: syncTime, now: now, todayUtc: todayUtc,
     submitDaily: submitDaily, dailyBoard: dailyBoard,

@@ -81,6 +81,8 @@
   function resume() { if (ensureCtx() && ctx.state === 'suspended') ctx.resume(); }
 
   function caption(text) { if (captionCb) captionCb(text); }
+  // Captions follow the game language (js/i18n.js).
+  function T(key, vars) { return root.CPI18n ? root.CPI18n.T(key, vars) : key; }
 
   function setAvStream(rng) { avRng = rng; }
   function variant(base, spread) {
@@ -141,7 +143,7 @@
       blip('effects', 660, 0.06, 'triangle', 0.12);
     },
     invalid: function () {
-      caption('That move is not allowed.');
+      caption(T('That move is not allowed.'));
       if (playSample(EVENT_SAMPLES.invalid)) return;
       blip('effects', 180, 0.15, 'square', 0.12, 120);
     },
@@ -150,76 +152,76 @@
       blip('effects', variant(520, 0.05), 0.05, 'sine', 0.08);
     },
     pop: function (size) {
-      caption('Popped ' + size + ' cubes.');
+      caption(T('Popped {n} cubes.', { n: size }));
       if (playSample(EVENT_SAMPLES.pop)) return;
       var base = 300 + Math.min(size, 12) * 30;
       blip('effects', variant(base, 0.06), 0.12, 'triangle', 0.25, base * 1.8);
       noiseBurst('effects', 0.08, 0.12, 2400);
     },
     rocketCreate: function () {
-      caption('Rocket forged.');
+      caption(T('Rocket forged.'));
       if (playSample(EVENT_SAMPLES.rocketCreate)) return;
       blip('effects', 500, 0.25, 'sawtooth', 0.18, 1000);
     },
     rocketFire: function () {
-      caption('Rocket fired.');
+      caption(T('Rocket fired.'));
       if (playSample(EVENT_SAMPLES.rocketFire)) return;
       noiseBurst('effects', 0.35, 0.3, 3000);
       blip('effects', 800, 0.3, 'sawtooth', 0.15, 200);
     },
     bombCreate: function () {
-      caption('Bomb forged.');
+      caption(T('Bomb forged.'));
       if (playSample(EVENT_SAMPLES.bombCreate)) return;
       blip('effects', 220, 0.35, 'sine', 0.28, 440);
     },
     bombFire: function () {
-      caption('Bomb exploded.');
+      caption(T('Bomb exploded.'));
       if (playSample(EVENT_SAMPLES.bombFire)) return;
       noiseBurst('effects', 0.5, 0.45, 900);
       blip('effects', 120, 0.45, 'sine', 0.35, 40);
     },
     chain: function (n) {
-      caption('Chain of ' + n + ' specials.');
+      caption(T('Chain of {n} specials.', { n: n }));
       if (playSample(EVENT_SAMPLES.chain)) return;
       for (var i = 0; i < Math.min(n, 4); i++)
         (function (k) { setTimeout(function () { blip('effects', 700 + k * 200, 0.1, 'triangle', 0.18); }, k * 70); })(i);
     },
     shuffle: function () {
-      caption('Board reshuffled.');
+      caption(T('Board reshuffled.'));
       if (playSample(EVENT_SAMPLES.shuffle)) return;
       noiseBurst('effects', 0.25, 0.2, 1800);
     },
     undo: function () {
-      caption('Move undone.');
+      caption(T('Move undone.'));
       if (playSample(EVENT_SAMPLES.undo)) return;
       blip('effects', 400, 0.1, 'sine', 0.15, 300);
     },
     hint: function () {
-      caption('Hint shown.');
+      caption(T('Hint shown.'));
       if (playSample(EVENT_SAMPLES.hint)) return;
       blip('effects', 880, 0.12, 'sine', 0.14, 990);
     },
     win: function () {
-      caption('Stage complete.');
+      caption(T('Stage complete.'));
       if (playSample(EVENT_SAMPLES.win)) return;
       [523, 659, 784, 1047].forEach(function (f, i) {
         setTimeout(function () { blip('effects', f, 0.3, 'triangle', 0.22); }, i * 130);
       });
     },
     lose: function () {
-      caption('Round over.');
+      caption(T('Round over.'));
       if (playSample(EVENT_SAMPLES.lose)) return;
       [392, 330, 262].forEach(function (f, i) {
         setTimeout(function () { blip('effects', f, 0.3, 'sine', 0.2); }, i * 160);
       });
     },
     wave: function (n) {
-      caption('Wave ' + n + ' complete.');
+      caption(T('Wave {n} complete.', { n: n }));
       if (playSample(EVENT_SAMPLES.wave)) return;
       blip('effects', 600, 0.2, 'triangle', 0.2, 900);
     },
     achievement: function () {
-      caption('Achievement unlocked.');
+      caption(T('Achievement unlocked.'));
       if (playSample(EVENT_SAMPLES.achievement)) return;
       blip('effects', 990, 0.25, 'sine', 0.2, 1320);
     },
@@ -232,13 +234,13 @@
       blip('effects', 880, 0.12, 'triangle', 0.16, 1320);
     },
     goalFill: function () {
-      caption('Goal filled.');
+      caption(T('Goal filled.'));
       if (playSample(EVENT_SAMPLES.goalFill)) return;
       blip('effects', 740, 0.12, 'triangle', 0.16);
       setTimeout(function () { blip('effects', 988, 0.16, 'triangle', 0.16); }, 90);
     },
     timeWarning: function () {
-      caption('15 seconds left.');
+      caption(T('15 seconds left.'));
       if (playSample(EVENT_SAMPLES.timeWarning)) return;
       blip('effects', 1200, 0.05, 'square', 0.1);
       setTimeout(function () { blip('effects', 1200, 0.05, 'square', 0.1); }, 110);

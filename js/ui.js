@@ -18,18 +18,9 @@
 
   function announce(msg) { $('live-status').textContent = ''; $('live-status').textContent = msg; }
   function announceAlert(msg) { $('live-alert').textContent = ''; $('live-alert').textContent = msg; }
-  var PT = {
-    'en-US': { offline: 'Offline — progress is stored on this device.', playing: 'Playing as {name}', synced: 'progress synced', saving: 'saving…', nosync: 'cloud sync unavailable', signIn: 'Sign in with StarHermit', invite: 'Invite a friend', copied: 'Invite link copied to the clipboard.', copyFail: 'Could not copy — invite link: {link}' },
-    'en-GB': { offline: 'Offline — progress is stored on this device.', playing: 'Playing as {name}', synced: 'progress synced', saving: 'saving…', nosync: 'cloud sync unavailable', signIn: 'Sign in with StarHermit', invite: 'Invite a friend', copied: 'Invite link copied to the clipboard.', copyFail: 'Could not copy — invite link: {link}' },
-    'es-419': { offline: 'Sin conexión: el progreso se guarda en este dispositivo.', playing: 'Jugando como {name}', synced: 'progreso sincronizado', saving: 'guardando…', nosync: 'sincronización en la nube no disponible', signIn: 'Iniciar sesión con StarHermit', invite: 'Invitar a un amigo', copied: 'Enlace de invitación copiado al portapapeles.', copyFail: 'No se pudo copiar. Enlace de invitación: {link}' },
-    'es-ES': { offline: 'Sin conexión: el progreso se guarda en este dispositivo.', playing: 'Jugando como {name}', synced: 'progreso sincronizado', saving: 'guardando…', nosync: 'sincronización en la nube no disponible', signIn: 'Iniciar sesión con StarHermit', invite: 'Invitar a un amigo', copied: 'Enlace de invitación copiado al portapapeles.', copyFail: 'No se ha podido copiar. Enlace de invitación: {link}' },
-    'de-DE': { offline: 'Offline – der Fortschritt wird auf diesem Gerät gespeichert.', playing: 'Du spielst als {name}', synced: 'Fortschritt synchronisiert', saving: 'wird gespeichert…', nosync: 'Cloud-Synchronisierung nicht verfügbar', signIn: 'Mit StarHermit anmelden', invite: 'Freund einladen', copied: 'Einladungslink in die Zwischenablage kopiert.', copyFail: 'Kopieren fehlgeschlagen – Einladungslink: {link}' },
-    'fr-FR': { offline: 'Hors ligne : la progression est enregistrée sur cet appareil.', playing: 'Vous jouez en tant que {name}', synced: 'progression synchronisée', saving: 'enregistrement…', nosync: 'synchronisation cloud indisponible', signIn: 'Se connecter avec StarHermit', invite: 'Inviter un ami', copied: 'Lien d’invitation copié dans le presse-papiers.', copyFail: 'Copie impossible — lien d’invitation : {link}' },
-    'fr-CA': { offline: 'Hors ligne : la progression est enregistrée sur cet appareil.', playing: 'Vous jouez en tant que {name}', synced: 'progression synchronisée', saving: 'enregistrement…', nosync: 'synchronisation infonuagique non disponible', signIn: 'Se connecter avec StarHermit', invite: 'Inviter un ami', copied: 'Lien d’invitation copié dans le presse-papiers.', copyFail: 'Copie impossible — lien d’invitation : {link}' },
-    'pt-BR': { offline: 'Offline — o progresso fica salvo neste dispositivo.', playing: 'Jogando como {name}', synced: 'progresso sincronizado', saving: 'salvando…', nosync: 'sincronização na nuvem indisponível', signIn: 'Entrar com StarHermit', invite: 'Convidar um amigo', copied: 'Link de convite copiado para a área de transferência.', copyFail: 'Não foi possível copiar — link de convite: {link}' },
-    'it-IT': { offline: 'Offline: i progressi sono salvati su questo dispositivo.', playing: 'Giochi come {name}', synced: 'progressi sincronizzati', saving: 'salvataggio…', nosync: 'sincronizzazione cloud non disponibile', signIn: 'Accedi con StarHermit', invite: 'Invita un amico', copied: 'Link di invito copiato negli appunti.', copyFail: 'Impossibile copiare. Link di invito: {link}' }
-  };
-  var P_STR = PT[root.CPGfxPanel ? root.CPGfxPanel.pickLocale(navigator.languages || [navigator.language]) : 'en-US'] || PT['en-US'];
+  // Strings follow the game language (js/i18n.js); keys are the US-English text.
+  function T(key, vars) { return root.CPI18n ? root.CPI18n.T(key, vars) : String(key).replace(/\{(\w+)\}/g, function (m, k) { return vars && vars[k] != null ? vars[k] : m; }); }
+  function N(key) { return key; }
 
   // ---------- key bindings (platform overrides via StarHermit controls) ----------
   var DEFAULT_KEYS = {
@@ -53,7 +44,7 @@
     put('key-hint', keysText('hint'));
     put('key-undo', keysText('undo'));
     put('key-pause', keysText('pause'));
-    put('key-camera', keysText('camera') + ' (reset)');
+    put('key-camera', T('{keys} (reset)', { keys: keysText('camera') }));
   }
 
   function toast(msg, ms) {
@@ -169,7 +160,7 @@
     var themeSel = $('set-theme');
     themeSel.innerHTML = '';
     Content.THEMES.forEach(function (t) {
-      var o = el('option', '', t.name + (themeUnlocked(t) ? '' : ' (unlock at ' + t.unlockStars + '★)'));
+      var o = el('option', '', T(t.name) + (themeUnlocked(t) ? '' : ' ' + T('(unlock at {n}★)', { n: t.unlockStars })));
       o.value = t.id;
       o.disabled = !themeUnlocked(t);
       themeSel.appendChild(o);
@@ -206,17 +197,17 @@
       Sess.saveProgress(app.progress);
       showLearn();
       showScreen('learn');
-      toast('Tutorial reset. Lesson 1 is ready.');
+      toast(T('Tutorial reset. Lesson 1 is ready.'));
     };
     $('btn-reset-progress').onclick = function () {
-      if (!confirm('Reset journey stars, achievements, and saved rounds?')) return;
+      if (!confirm(T('Reset journey stars, achievements, and saved rounds?'))) return;
       Sess.Session.clearSnapshot();
       localStorage.removeItem(Sess.LS.progress);
       localStorage.removeItem(Sess.LS.achievements);
       localStorage.removeItem(Sess.LS.dailyBest);
       app.progress = Sess.loadProgress();
       refreshTitle();
-      toast('Progress reset.');
+      toast(T('Progress reset.'));
     };
   }
 
@@ -224,18 +215,18 @@
   function levelCard(cfg, opts) {
     var b = el('button', 'level-card' + (opts.mastery ? ' mastery' : '') + (opts.locked ? ' locked' : ''));
     b.disabled = !!opts.locked;
-    var name = el('span', 'card-name', esc(cfg.name));
+    var name = el('span', 'card-name', opts.label || T(cfg.name));
     b.appendChild(name);
     var meta = [];
-    if (cfg.moveLimit) meta.push(cfg.moveLimit + ' moves');
+    if (cfg.moveLimit) meta.push(T('{n} moves', { n: cfg.moveLimit }));
     if (cfg.timeLimitSec) meta.push(cfg.timeLimitSec + 's');
-    if (cfg.endless) meta.push('endless');
+    if (cfg.endless) meta.push(T('endless'));
     meta.push(cfg.board.rows + '×' + cfg.board.cols);
-    meta.push(cfg.colors + ' colors');
+    meta.push(T('{n} colors', { n: cfg.colors }));
     b.appendChild(el('span', 'card-meta', meta.join(' · ')));
     if (opts.stars) b.appendChild(el('span', 'stars', '★'.repeat(opts.stars) + '☆'.repeat(3 - opts.stars)));
-    if (opts.locked) b.appendChild(el('span', 'card-meta', 'Finish the previous stage to unlock.'));
-    if (cfg.intro) b.appendChild(el('span', 'card-meta', esc(cfg.intro)));
+    if (opts.locked) b.appendChild(el('span', 'card-meta', T('Finish the previous stage to unlock.')));
+    if (cfg.intro) b.appendChild(el('span', 'card-meta', T(cfg.intro)));
     b.setAttribute('role', 'listitem');
     b.onclick = function () { opts.onPick(); };
     return b;
@@ -281,16 +272,17 @@
     Content.tutorialLessons().forEach(function (lesson, i) {
       var locked = i > 0 && !app.progress.completed[Content.tutorialLessons()[i - 1].id];
       var b = levelCard({
-        name: (i + 1) + '. ' + lesson.title, intro: lesson.text,
+        name: lesson.title, intro: lesson.text,
         moveLimit: 0, timeLimitSec: 0, endless: null, board: lesson.cfg.board, colors: lesson.cfg.colors
       }, {
+        label: (i + 1) + '. ' + T(lesson.title),
         locked: locked,
         onPick: function () {
           app.currentList = 'learn'; app.currentIdx = i;
           startRound(lesson.cfg, { lesson: lesson, forcedGrid: lesson.force.grid, forcedSpecials: lesson.force.specials });
         }
       });
-      if (app.progress.completed[lesson.id]) b.appendChild(el('span', 'stars', '✓ done'));
+      if (app.progress.completed[lesson.id]) b.appendChild(el('span', 'stars', '✓ ' + T('done')));
       list.appendChild(b);
     });
   }
@@ -301,8 +293,8 @@
     list.innerHTML = '';
     Content.ACHIEVEMENTS.forEach(function (a) {
       var li = el('li', have[a.key] ? 'done' : 'locked');
-      li.appendChild(el('span', 'ach-name', (have[a.key] ? '✓ ' : '') + a.name + ' — '));
-      li.appendChild(el('span', '', a.desc));
+      li.appendChild(el('span', 'ach-name', (have[a.key] ? '✓ ' : '') + T(a.name) + ' — '));
+      li.appendChild(el('span', '', T(a.desc)));
       list.appendChild(li);
     });
   }
@@ -313,18 +305,18 @@
     var cfg = dailyCfg();
     var info = $('daily-info');
     info.innerHTML = '';
-    info.appendChild(el('p', '', 'Seed ' + cfg.seed + ' · ' + cfg.board.rows + '×' + cfg.board.cols +
-      ' · ' + cfg.colors + ' colors · ' + (cfg.moveLimit ? cfg.moveLimit + ' moves' : 'no move limit') +
+    info.appendChild(el('p', '', T('Seed {seed}', { seed: cfg.seed }) + ' · ' + cfg.board.rows + '×' + cfg.board.cols +
+      ' · ' + T('{n} colors', { n: cfg.colors }) + ' · ' + (cfg.moveLimit ? T('{n} moves', { n: cfg.moveLimit }) : T('no move limit')) +
       (cfg.timeLimitSec ? ' · ' + cfg.timeLimitSec + 's' : '')));
     var best = Sess.readLS(Sess.LS.dailyBest, {});
-    if (best[cfg.date]) info.appendChild(el('p', '', 'Your best today: ' + best[cfg.date] + ' points'));
+    if (best[cfg.date]) info.appendChild(el('p', '', T('Your best today: {n} points', { n: best[cfg.date] })));
     var msLeft = (function () {
       var d = new Date(Sess.now());
       var next = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
       return next - Sess.now();
     })();
     var hh = Math.floor(msLeft / 3600000), mm = Math.floor(msLeft % 3600000 / 60000);
-    info.appendChild(el('p', 'muted', 'New challenge in ' + hh + 'h ' + mm + 'm (server-synced).'));
+    info.appendChild(el('p', 'muted', T('New challenge in {h}h {m}m (server-synced).', { h: hh, m: mm })));
     $('daily-note').textContent = '';
     refreshDailyBoard(cfg.date);
     $('btn-daily-play').onclick = function () { app.currentList = 'daily'; app.currentIdx = 0; startRound(cfg); };
@@ -337,13 +329,13 @@
     if (!el || !Platform) return;
     if (!Platform.hosted) {
       el.className = 'net-off';
-      el.textContent = 'offline-capable';
+      el.textContent = T('offline-capable');
       return;
     }
     el.className = 'net-ok';
     var name = Platform.profile ? Platform.profile.name : '…';
-    el.textContent = P_STR.playing.replace('{name}', name) + ' · ' +
-      (Platform.sync === 'synced' ? P_STR.synced : Platform.sync === 'saving' ? P_STR.saving : P_STR.nosync);
+    el.textContent = T('Playing as {name}', { name: name }) + ' · ' +
+      (Platform.sync === 'synced' ? T('progress synced') : Platform.sync === 'saving' ? T('saving…') : T('cloud sync unavailable'));
   }
 
   // Title: sign-in (on *.starhermit.com without a token) / Invite a friend.
@@ -358,8 +350,8 @@
   function inviteFriend() {
     var link = root.CPPlatform.inviteLink();
     if (!link) return;
-    var fail = function () { toast(P_STR.copyFail.replace('{link}', link), 6000); };
-    try { navigator.clipboard.writeText(link).then(function () { toast(P_STR.copied); }, fail); } catch (e) { fail(); }
+    var fail = function () { toast(T('Could not copy — invite link: {link}', { link: link }), 6000); };
+    try { navigator.clipboard.writeText(link).then(function () { toast(T('Invite link copied to the clipboard.')); }, fail); } catch (e) { fail(); }
   }
 
   // Signed-in boot work: nickname, remote save (wins), settings KV, bindings.
@@ -385,6 +377,7 @@
       renderNetStatus();
     }).catch(function () {});
     app.platformSettingsReady = false;
+    Platform.onSaveConflict(mergeCloudConflict);
     Platform.getSettings().then(function (remote) {
       app.platformSettingsReady = true;
       var changed = false;
@@ -400,29 +393,46 @@
     Platform.loadBindings(DEFAULT_KEYS).then(setBindings).catch(function () {});
   }
 
+  // Another device saved since this one last loaded: reload the cloud slot,
+  // merge it with local progress (better stars, union of completions, larger
+  // cube count), adopt the merge and save it back. The in-progress round lives
+  // in the local snapshot and is untouched.
+  function mergeCloudConflict() {
+    var Platform = root.CPPlatform;
+    if (!Platform || app.merging) return;
+    app.merging = true;
+    Platform.loadCloud().then(function (remoteJson) {
+      if (Platform.saveConflicted()) return; // reload failed: writes stay blocked
+      var remote = Sess.loadProgressRaw(remoteJson);
+      app.progress = Sess.mergeProgress(remote, app.progress);
+      Sess.saveProgress(app.progress); // also pushes the merge to the cloud slot
+      refreshTitle();
+      renderNetStatus();
+    }).catch(function () {}).then(function () { app.merging = false; });
+  }
+
   // Today's board lives on this device (no own-server board).
   function refreshDailyBoard(date) {
     var ol = $('daily-board');
     ol.innerHTML = '';
     Sess.dailyBoard(date).then(function (body) {
       (body.entries || []).forEach(function (e2) {
-        ol.appendChild(el('li', '', esc(e2.name) + ' — ' + e2.score + ' pts (' + e2.moves + ' moves' +
-          (e2.won ? ', goals complete' : '') + ')'));
+        ol.appendChild(el('li', '', esc(e2.name) + ' — ' + T(e2.won ? '{score} pts ({moves} moves, goals complete)' : '{score} pts ({moves} moves)', { score: e2.score, moves: e2.moves })));
       });
-      if (!ol.children.length) ol.appendChild(el('li', '', 'No scores on this device yet today.'));
+      if (!ol.children.length) ol.appendChild(el('li', '', T('No scores on this device yet today.')));
     });
   }
 
   function showScore() {
     var info = $('score-info');
-    info.textContent = Content.SCORE_CHASE.intro;
+    info.textContent = T(Content.SCORE_CHASE.intro);
     var best = Sess.readLS('cubepop:score-best:v1', []);
     var ol = $('score-best');
     ol.innerHTML = '';
     best.slice(0, 10).forEach(function (r) {
-      ol.appendChild(el('li', '', r.score + ' pts · wave ' + r.waves + ' · ' + new Date(r.at).toLocaleDateString()));
+      ol.appendChild(el('li', '', T('{score} pts · wave {wave}', { score: r.score, wave: r.waves }) + ' · ' + new Date(r.at).toLocaleDateString(root.CPI18n ? root.CPI18n.lang : undefined)));
     });
-    if (!best.length) ol.appendChild(el('li', '', 'No runs yet.'));
+    if (!best.length) ol.appendChild(el('li', '', T('No runs yet.')));
     $('btn-score-play').onclick = function () {
       app.currentList = 'score'; app.currentIdx = 0;
       var cfg = Object.assign({}, Content.SCORE_CHASE, { seed: (Math.random() * 0xffffffff) >>> 0 });
@@ -435,17 +445,17 @@
     var cards = $('help-cards');
     cards.innerHTML = '';
     [
-      ['Pop groups', 'Tap a connected group of 2 or more matching cubes to pop them. Popped cubes count toward the goals on the left.'],
-      ['Rockets', 'A group of 5+ leaves a rocket on the tapped cube. Tap the rocket to clear its whole row or column. Taller groups make column rockets; wider groups make row rockets.'],
-      ['Bombs', 'A group of 8+ leaves a bomb. Tap it to clear a 3×3 area around it.'],
-      ['Chains', 'Blasts that touch other specials set them off too. Each extra special in one move earns a chain bonus.'],
-      ['Goals and limits', 'Fill every color quota to win. Some stages limit your moves or time — unused moves and fast finishes earn bonus points.'],
-      ['No dead ends', 'If no legal move remains, the wall reshuffles itself for free.'],
-      ['Assists', 'Where allowed: H shows a hint, U undoes your last pop. Challenges may disable them.']
+      [N('Pop groups'), N('Tap a connected group of 2 or more matching cubes to pop them. Popped cubes count toward the goals on the left.')],
+      [N('Rockets'), N('A group of 5+ leaves a rocket on the tapped cube. Tap the rocket to clear its whole row or column. Taller groups make column rockets; wider groups make row rockets.')],
+      [N('Bombs'), N('A group of 8+ leaves a bomb. Tap it to clear a 3×3 area around it.')],
+      [N('Chains'), N('Blasts that touch other specials set them off too. Each extra special in one move earns a chain bonus.')],
+      [N('Goals and limits'), N('Fill every color quota to win. Some stages limit your moves or time — unused moves and fast finishes earn bonus points.')],
+      [N('No dead ends'), N('If no legal move remains, the wall reshuffles itself for free.')],
+      [N('Assists'), N('Where allowed: H shows a hint, U undoes your last pop. Challenges may disable them.')]
     ].forEach(function (c) {
       var d = el('div', 'help-card');
-      d.appendChild(el('h4', '', c[0]));
-      d.appendChild(el('p', '', c[1]));
+      d.appendChild(el('h4', '', T(c[0])));
+      d.appendChild(el('p', '', T(c[1])));
       cards.appendChild(d);
     });
   }
@@ -492,7 +502,7 @@
       sw.style.background = colorHex(+g, true);
       sw.setAttribute('aria-hidden', 'true');
       li.appendChild(sw);
-      li.appendChild(el('span', 'goal-progress', colorLabel(+g).label + ' ' + Math.min(haveN, need) + ' / ' + need));
+      li.appendChild(el('span', 'goal-progress', T(colorLabel(+g).label) + ' ' + Math.min(haveN, need) + ' / ' + need));
       goals.appendChild(li);
     });
     $('btn-undo').disabled = !app.session.canUndo();
@@ -512,7 +522,7 @@
       if (remain < 15000 && remain > 0 && !st.terminal && !app.timeWarned && app.state === 'active') {
         app.timeWarned = true;
         Audio.timeWarning();
-        announce('15 seconds left.');
+        announce(T('15 seconds left.'));
       }
       if (remain <= 0 && !st.terminal) {
         var res = app.session.tickClock();
@@ -537,16 +547,13 @@
         var cell = st.grid[r][c];
         var b = el('button', 'mirror-cell');
         if (cell) {
-          var desc = colorLabel(cell.c).label;
-          if (cell.s === 1) desc += ' row rocket';
-          else if (cell.s === 2) desc += ' column rocket';
-          else if (cell.s === 3) desc += ' bomb';
-          else {
-            var size = Rules.groupAt(st, r, c).length;
-            desc += ', group of ' + size;
-          }
+          var colorName = T(colorLabel(cell.c).label), desc;
+          if (cell.s === 1) desc = T('{color} row rocket', { color: colorName });
+          else if (cell.s === 2) desc = T('{color} column rocket', { color: colorName });
+          else if (cell.s === 3) desc = T('{color} bomb', { color: colorName });
+          else desc = T('{color}, group of {n}', { color: colorName, n: Rules.groupAt(st, r, c).length });
           b.textContent = colorLabel(cell.c).icon;
-          b.setAttribute('aria-label', 'Row ' + (r + 1) + ' column ' + (c + 1) + ': ' + desc);
+          b.setAttribute('aria-label', T('Row {r} column {c}: {desc}', { r: r + 1, c: c + 1, desc: desc }));
           b.dataset.r = r; b.dataset.c = c;
           (function (rr, cc) {
             b.onclick = function () { tryPop(rr, cc); };
@@ -554,7 +561,7 @@
           })(r, c);
         } else {
           b.textContent = '·';
-          b.setAttribute('aria-label', 'Row ' + (r + 1) + ' column ' + (c + 1) + ': empty');
+          b.setAttribute('aria-label', T('Row {r} column {c}: {desc}', { r: r + 1, c: c + 1, desc: T('empty') }));
           b.disabled = true;
         }
         td.appendChild(b);
@@ -600,7 +607,7 @@
         },
         onSettled: function () { /* animations landed */ },
         onContextLost: function () {
-          announceAlert('Graphics context lost — switching to grid mode. Your round is safe.');
+          announceAlert(T('Graphics context lost — switching to grid mode. Your round is safe.'));
           app.webglFailed = true;
           $('board-mirror-wrap').classList.remove('sr-only');
         }
@@ -636,19 +643,16 @@
 
     // lesson box
     var lb = $('lesson-box');
+    delete lb.dataset.firstRun;
     if (opts.lesson) {
       lb.hidden = false;
-      $('lesson-title').textContent = opts.lesson.title;
-      $('lesson-text').textContent = opts.lesson.text;
+      lb.dataset.lesson = '1';
     } else if (!Sess.loadAchievements()['first-pop']) {
       // First-run rule guidance stays visible until the first successful pop.
       lb.hidden = false;
-      $('lesson-title').textContent = 'How to play';
-      $('lesson-text').textContent = cfg.intro && /pop/i.test(cfg.intro) ? cfg.intro + ' Bigger groups score more.'
-        : 'Tap a group of two or more touching cubes of the same color to pop it. Bigger groups score more. ' +
-          (cfg.intro || 'Fill every goal to clear the stage.');
       lb.dataset.firstRun = '1';
     } else lb.hidden = true;
+    renderLessonBox();
 
     updateHUD();
     updateClock();
@@ -659,14 +663,56 @@
       app.session.startPerf = performance.now();
       setState('active', 'countdown-done');
       app.inputLocked = false;
-      announce(cfg.name + '. ' + (opts.lesson ? opts.lesson.text :
-        'Fill the goals to win. ' + legalSummary()));
+      announce((cfg.date ? T('Daily {date}', { date: cfg.date }) : T(cfg.name)) + '. ' + (opts.lesson ? T(opts.lesson.text) :
+        T('Fill the goals to win.') + ' ' + legalSummary()));
       setFocus(0, 0);
       var first = document.querySelector('#board-mirror button');
       if (first && !app.webglFailed) { /* keep focus in menus */ }
     });
     clearInterval(app.clockTimer);
     app.clockTimer = setInterval(updateClock, 250);
+  }
+
+  // Lesson / first-run guidance in the goal rail (re-rendered on a language change).
+  function renderLessonBox() {
+    var lb = $('lesson-box');
+    if (!lb || lb.hidden || !app.session) return;
+    var lesson = app.session.lesson, cfg = app.session.cfg || {};
+    if (lesson) {
+      $('lesson-title').textContent = T(lesson.title);
+      $('lesson-text').textContent = T(lesson.text);
+    } else if (lb.dataset.firstRun) {
+      $('lesson-title').textContent = T('How to play');
+      $('lesson-text').textContent = cfg.intro && /pop/i.test(cfg.intro) ? T(cfg.intro) + ' ' + T('Bigger groups score more.')
+        : T('Tap a group of two or more touching cubes of the same color to pop it. Bigger groups score more.') + ' ' +
+          (cfg.intro ? T(cfg.intro) : T('Fill every goal to clear the stage.'));
+    }
+  }
+
+  // The game language changed: re-render every visible screen, the HUD and
+  // open overlays in place. The round, its clock and its state are untouched.
+  function onLanguageChange() {
+    renderKeyHelp();
+    renderNetStatus();
+    refreshTitle();
+    var shown = document.querySelector('.screen:not([hidden])');
+    var name = shown && shown.dataset.screen;
+    if (name === 'journey') showJourney();
+    else if (name === 'daily') showDaily();
+    else if (name === 'practice') showPractice();
+    else if (name === 'challenge') showChallenge();
+    else if (name === 'score') showScore();
+    else if (name === 'learn') showLearn();
+    else if (name === 'achievements') showAchievements();
+    else if (name === 'help') showHelp();
+    // Settings: the theme list and the game's own Graphics controls rebuild;
+    // the shared Language / Sound / Report sections (game-options.js) stay.
+    if (app.settings) bindSettings();
+    if (app.session) {
+      updateHUD();
+      renderLessonBox();
+      if (!$('overlay-results').hidden) renderResultsText();
+    }
   }
 
   // Number of colour quotas already met (used for the goal-fill cue).
@@ -679,7 +725,7 @@
   function legalSummary() {
     var acts = Rules.legalActions(app.session.state);
     var groups = acts.filter(function (a) { return a.kind === 'pop'; });
-    return groups.length ? groups.length + ' cubes in poppable groups.' : 'Fire a special to continue.';
+    return groups.length ? T('{n} cubes in poppable groups.', { n: groups.length }) : T('Fire a special to continue.');
   }
 
   function runCountdown(done) {
@@ -687,7 +733,7 @@
     if (app.settings.reducedMotion) { done(); return; }
     setState('countdown', 'preparing');
     ov.hidden = false;
-    var seq = ['3', '2', '1', 'Pop!'];
+    var seq = ['3', '2', '1', T('Pop!')];
     var i = 0;
     (function step() {
       if (i < seq.length) {
@@ -714,11 +760,11 @@
       if (res.duplicate) return;
       Audio.invalid();
       var why = {
-        'group-too-small': 'That cube is not in a group of ' + (app.session.state.cfg.minGroup || 2) + ' or more.',
-        'empty-cell': 'That cell is empty.',
-        'bad-location': 'That cell is outside the wall.',
-        'game-ended': 'The round is over.'
-      }[res.reason] || 'That move is not allowed.';
+        'group-too-small': T('That cube is not in a group of {n} or more.', { n: app.session.state.cfg.minGroup || 2 }),
+        'empty-cell': T('That cell is empty.'),
+        'bad-location': T('That cell is outside the wall.'),
+        'game-ended': T('The round is over.')
+      }[res.reason] || T('That move is not allowed.');
       announceAlert(why);
       toast(why);
       if (app.renderer) app.renderer.setHoverGroup([], true);
@@ -740,8 +786,7 @@
       setState('active', 'resolved');
       app.inputLocked = false;
       var popEv = res.events.filter(function (e) { return e.type === 'pop'; })[0];
-      if (popEv) announce('Popped ' + popEv.size + ' ' + colorLabel(popEv.color).label + ' cubes. Score ' +
-        Rules.currentScore(app.session.state) + '.');
+      if (popEv) announce(T('Popped {n} {color} cubes. Score {score}.', { n: popEv.size, color: T(colorLabel(popEv.color).label), score: Rules.currentScore(app.session.state) }));
       setFocus(app.focus.r, app.focus.c);
     });
   }
@@ -756,8 +801,8 @@
           break;
         case 'fire': (e.special === 3) ? Audio.bombFire() : Audio.rocketFire(); break;
         case 'chain': Audio.chain(e.count); break;
-        case 'shuffle': Audio.shuffle(); announce('No moves left — the wall reshuffled.'); break;
-        case 'wave': Audio.wave(e.wave); announce('Wave ' + e.wave + ' complete. New goals, +' + e.moveBank + ' moves in the bank.'); break;
+        case 'shuffle': Audio.shuffle(); announce(T('No moves left — the wall reshuffled.')); break;
+        case 'wave': Audio.wave(e.wave); announce(T('Wave {n} complete. New goals, +{moves} moves in the bank.', { n: e.wave, moves: e.moveBank })); break;
       }
     });
     // achievements that fire mid-round
@@ -831,8 +876,8 @@
     if (Sess.unlockAchievement(key)) {
       var def = Content.ACHIEVEMENTS.filter(function (a) { return a.key === key; })[0];
       Audio.achievement();
-      toast('Achievement: ' + (def ? def.name : key));
-      announce('Achievement unlocked: ' + (def ? def.name : key));
+      toast(T('Achievement: {name}', { name: def ? T(def.name) : key }));
+      announce(T('Achievement unlocked: {name}', { name: def ? T(def.name) : key }));
       return true;
     }
     return false;
@@ -842,42 +887,53 @@
   function postToLeaderboard(total) {
     var line = $('results-lb');
     if (!line) return;
+    app.lbResult = null;
     if (!window.CPPlatform || !CPPlatform.hosted) { line.hidden = true; return; }
     line.hidden = false;
-    line.textContent = 'Posting score to the leaderboard…';
+    renderLeaderboardLine();
     CPPlatform.submitScore(total).then(function (r) {
-      line.textContent = !r.posted ? 'Score not posted to the leaderboard.'
-        : r.rank ? 'Leaderboard rank: #' + r.rank : 'Score posted to the leaderboard.';
+      app.lbResult = r;
+      renderLeaderboardLine();
     });
   }
+  function renderLeaderboardLine() {
+    var line = $('results-lb'), r = app.lbResult;
+    if (!line || line.hidden) return;
+    line.textContent = !r ? T('Posting score to the leaderboard…') : !r.posted ? T('Score not posted to the leaderboard.')
+      : r.rank ? T('Leaderboard rank: #{rank}', { rank: r.rank }) : T('Score posted to the leaderboard.');
+  }
 
-  function showResults(won) {
-    var st = app.session.state;
-    var ov = $('overlay-results');
-    app.lastFocusEl = document.activeElement;
-    ov.hidden = false;
-    var reasonText = {
-      'goals-complete': 'All goals complete!',
-      'move-limit': 'Out of moves',
-      'time-up': 'Time is up',
-      'resigned': 'Round resigned'
-    }[st.terminal.reason] || 'Round over';
-    $('results-headline').textContent = (won ? 'You win — ' : '') + reasonText;
-    var banner = $('results-banner');
-    banner.hidden = !won || banner.dataset.failed === '1';
-    announce('Round over. ' + reasonText + ' Score ' + st.score.total + '.');
+  function resultReason(st) {
+    return {
+      'goals-complete': T('All goals complete!'),
+      'move-limit': T('Out of moves'),
+      'time-up': T('Time is up'),
+      'resigned': T('Round resigned')
+    }[st.terminal.reason] || T('Round over');
+  }
 
+  // Headline and score breakdown (re-rendered on a language change).
+  function renderResultsText() {
+    var st = app.session && app.session.state;
+    if (!st) return;
+    if (app.resultsLesson) {
+      $('results-headline').textContent = T('Lesson complete: {title}', { title: T(app.resultsLesson.title) });
+      return;
+    }
+    if (!st.terminal) return;
+    var won = st.terminal.won, reasonText = resultReason(st);
+    $('results-headline').textContent = won ? T('You win — {reason}', { reason: reasonText }) : reasonText;
     var tb = $('results-breakdown').querySelector('tbody');
     tb.innerHTML = '';
     var sc = st.score;
     var rows = [
-      ['Cubes cleared (' + sc.cubes + ')', sc.popPoints],
-      ['Group size bonus', sc.groupBonus],
-      ['Specials forged (' + sc.specialsMade + ')', sc.specialBonus],
-      ['Chain bonus (best ×' + sc.chainsBest + ')', sc.chainBonus],
-      ['Unused moves', sc.moveBonus],
-      ['Time under par', sc.timeBonus],
-      ['Wave bonus (' + sc.waves + ')', sc.waveBonus]
+      [T('Cubes cleared ({n})', { n: sc.cubes }), sc.popPoints],
+      [T('Group size bonus'), sc.groupBonus],
+      [T('Specials forged ({n})', { n: sc.specialsMade }), sc.specialBonus],
+      [T('Chain bonus (best ×{n})', { n: sc.chainsBest }), sc.chainBonus],
+      [T('Unused moves'), sc.moveBonus],
+      [T('Time under par'), sc.timeBonus],
+      [T('Wave bonus ({n})', { n: sc.waves }), sc.waveBonus]
     ];
     rows.forEach(function (r) {
       if (!r[1]) return;
@@ -888,9 +944,24 @@
     });
     var tr = document.createElement('tr');
     tr.className = 'total';
-    tr.appendChild(el('td', '', 'Total'));
+    tr.appendChild(el('td', '', T('Total')));
     tr.appendChild(el('td', '', String(sc.total)));
     tb.appendChild(tr);
+    renderLeaderboardLine();
+  }
+
+  function showResults(won) {
+    var st = app.session.state;
+    var ov = $('overlay-results');
+    app.lastFocusEl = document.activeElement;
+    app.resultsLesson = null;
+    ov.hidden = false;
+    var reasonText = resultReason(st);
+    var banner = $('results-banner');
+    banner.hidden = !won || banner.dataset.failed === '1';
+    announce(T('Round over. {reason} Score {score}.', { reason: reasonText, score: st.score.total }));
+    var sc = st.score;
+    renderResultsText();
 
     var stars = app.session.stars();
     $('results-stars').textContent = won && stars ? '★'.repeat(stars) + '☆'.repeat(3 - stars) : '';
@@ -922,11 +993,11 @@
     $('btn-daily-submit').disabled = true;
     Sess.submitDaily(name, st.cfg.date, app.session.envelope())
       .then(function (body) {
-        $('daily-submit-status').textContent = 'Saved — rank #' + body.rank + ' on this device (' + body.score + ' pts).';
+        $('daily-submit-status').textContent = T('Saved — rank #{rank} on this device ({score} pts).', { rank: body.rank, score: body.score });
         refreshDailyBoard(st.cfg.date);
       })
       .catch(function (e) {
-        $('daily-submit-status').textContent = 'Could not save (' + e.message + ').';
+        $('daily-submit-status').textContent = T('Could not save ({error}).', { error: e.message });
       })
       .finally(function () { $('btn-daily-submit').disabled = false; });
   }
@@ -942,9 +1013,10 @@
     app.session.clearSnapshot();
     var ov = $('overlay-results');
     ov.hidden = false;
-    $('results-headline').textContent = 'Lesson complete: ' + lesson.title;
+    app.resultsLesson = lesson;
+    renderResultsText();
     $('results-banner').hidden = $('results-banner').dataset.failed === '1';
-    announce('Lesson complete: ' + lesson.title);
+    announce(T('Lesson complete: {title}', { title: T(lesson.title) }));
     $('results-breakdown').querySelector('tbody').innerHTML = '';
     $('results-stars').textContent = '';
     $('results-ach').textContent = '';
@@ -971,9 +1043,9 @@
     // session would lack its lesson object and could never complete.
     if (app.session.kind !== 'tutorial') {
       app.session.saveSnapshot();
-      announce('Paused. Round saved locally.');
+      announce(T('Paused. Round saved locally.'));
     } else {
-      announce('Paused.');
+      announce(T('Paused.'));
     }
     Audio.suspendAll();
   }
@@ -987,7 +1059,7 @@
     Audio.resumeAll();
     if (app.pendingResolution) { var finish = app.pendingResolution; app.pendingResolution = null; finish(); }
     if (app.lastFocusEl && app.lastFocusEl.focus) app.lastFocusEl.focus();
-    announce('Resumed.');
+    announce(T('Resumed.'));
   }
 
   function leaveRound() {
@@ -1013,15 +1085,16 @@
   function refreshTitle() {
     var p = app.progress;
     var journeyDone = Content.JOURNEY.filter(function (l) { return p.completed[l.id]; }).length;
-    $('title-progress').textContent =
-      'Journey ' + journeyDone + '/' + Content.JOURNEY.length + ' · ' + Sess.totalStars(p) + ' stars · ' +
-      Object.keys(Sess.loadAchievements()).length + '/' + Content.ACHIEVEMENTS.length + ' achievements';
+    $('title-progress').textContent = T('Journey {done}/{total} · {stars} stars · {ach}/{achTotal} achievements', {
+      done: journeyDone, total: Content.JOURNEY.length, stars: Sess.totalStars(p),
+      ach: Object.keys(Sess.loadAchievements()).length, achTotal: Content.ACHIEVEMENTS.length
+    });
     $('btn-resume').hidden = !Sess.Session.loadSnapshot();
     // Play = next uncompleted journey stage (two deliberate actions to play)
     var next = Content.JOURNEY.filter(function (l, i) {
       return !p.completed[l.id] && (i === 0 || p.completed[Content.JOURNEY[i - 1].id]);
     })[0];
-    $('btn-play').textContent = next ? 'Play: ' + next.name : 'Play: Journey';
+    $('btn-play').textContent = next ? T('Play: {name}', { name: T(next.name) }) : T('Play: Journey');
   }
 
   // ------------------------------------------------------------- input
@@ -1045,8 +1118,9 @@
                  Math.min(cols - 1, Math.max(0, app.focus.c + dc)));
         Audio.select();
         var cell = st.grid[app.focus.r][app.focus.c];
-        if (cell) announce('Row ' + (app.focus.r + 1) + ' column ' + (app.focus.c + 1) + ', ' + colorLabel(cell.c).label +
-          (cell.s ? ' special' : ', group of ' + Rules.groupAt(st, app.focus.r, app.focus.c).length));
+        if (cell) announce(cell.s
+          ? T('Row {r} column {c}, {color} special', { r: app.focus.r + 1, c: app.focus.c + 1, color: T(colorLabel(cell.c).label) })
+          : T('Row {r} column {c}, {color}, group of {n}', { r: app.focus.r + 1, c: app.focus.c + 1, color: T(colorLabel(cell.c).label), n: Rules.groupAt(st, app.focus.r, app.focus.c).length }));
       } else if (action === 'pop') {
         ev.preventDefault();
         tryPop(app.focus.r, app.focus.c);
@@ -1057,7 +1131,7 @@
       } else if (action === 'pause') {
         ev.preventDefault(); pauseRound();
       } else if (action === 'camera') {
-        if (app.renderer) { app.renderer.resetCamera(); announce('Camera reset.'); }
+        if (app.renderer) { app.renderer.resetCamera(); announce(T('Camera reset.')); }
       }
     });
 
@@ -1134,13 +1208,13 @@
     };
     $('btn-copy-replay').onclick = function () {
       var txt = $('replay-json').textContent;
-      if (navigator.clipboard) navigator.clipboard.writeText(txt).then(function () { toast('Replay copied.'); });
-      else toast('Select the replay text to copy.');
+      if (navigator.clipboard) navigator.clipboard.writeText(txt).then(function () { toast(T('Replay copied.')); });
+      else toast(T('Select the replay text to copy.'));
     };
     $('btn-webgl-continue').onclick = function () {
       $('webgl-fail').hidden = true;
       $('board-mirror-wrap').classList.remove('sr-only');
-      announce('Grid mode active. Use the grid buttons to play.');
+      announce(T('Grid mode active. Use the grid buttons to play.'));
     };
 
     document.addEventListener('visibilitychange', function () {
@@ -1151,29 +1225,29 @@
   function doHint() {
     if (!app.session || app.state !== 'active') return;
     var st = app.session.state;
-    if (!(st.cfg.mechanics && st.cfg.mechanics.hint)) { toast('Hints are disabled in this mode.'); return; }
+    if (!(st.cfg.mechanics && st.cfg.mechanics.hint)) { toast(T('Hints are disabled in this mode.')); return; }
     var h = app.session.hint();
     if (!h) return;
     Audio.hint();
     setFocus(h.r, h.c);
     if (app.renderer) app.renderer.setHintCell(h.r, h.c);
     var why = {
-      'make-bomb': 'This group forges a bomb.', 'make-rocket': 'This group forges a rocket.',
-      chain: 'Firing this special starts a chain.', goal: 'This group fills a goal color.',
-      biggest: 'This is the biggest group.', fire: 'Fire this special.'
-    }[h.why] || 'Try here.';
-    announce('Hint: row ' + (h.r + 1) + ' column ' + (h.c + 1) + '. ' + why);
-    toast('Hint: ' + why);
+      'make-bomb': T('This group forges a bomb.'), 'make-rocket': T('This group forges a rocket.'),
+      chain: T('Firing this special starts a chain.'), goal: T('This group fills a goal color.'),
+      biggest: T('This is the biggest group.'), fire: T('Fire this special.')
+    }[h.why] || T('Try here.');
+    announce(T('Hint: row {r} column {c}. {why}', { r: h.r + 1, c: h.c + 1, why: why }));
+    toast(T('Hint: {why}', { why: why }));
   }
 
   function doUndo() {
     if (!app.session || app.state !== 'active') return;
-    if (!app.session.canUndo()) { toast('Nothing to undo.'); return; }
+    if (!app.session.canUndo()) { toast(T('Nothing to undo.')); return; }
     app.session.undo();
     Audio.undo();
     if (app.renderer) { app.renderer.syncToState(app.session.state); app.renderer.setHintCell(null); }
     updateHUD();
-    announce('Move undone. Score ' + Rules.currentScore(app.session.state) + '.');
+    announce(T('Move undone. Score {score}.', { score: Rules.currentScore(app.session.state) }));
     // Lesson goals can be met by undoing (e.g. the "Second chances" lesson).
     if (app.session.lesson && app.session.lessonGoalMet()) lessonComplete();
   }
@@ -1252,7 +1326,7 @@
     $('btn-resume').onclick = function () {
       Audio.unlock(); Audio.click();
       var s = Sess.Session.loadSnapshot();
-      if (!s) { toast('No saved round.'); return; }
+      if (!s) { toast(T('No saved round.')); return; }
       app.session = s;
       setState('preparing', 'resume-snapshot');
       showScreen('game');
@@ -1271,7 +1345,7 @@
         s.startPerf = performance.now() - s.state.elapsedMs;
         setState('active', 'resumed');
         app.inputLocked = false;
-        announce('Round resumed. ' + legalSummary());
+        announce(T('Round resumed.') + ' ' + legalSummary());
       });
       clearInterval(app.clockTimer);
       app.clockTimer = setInterval(updateClock, 250);
@@ -1306,8 +1380,6 @@
         if (nameInput && !signedIn) nameInput.disabled = false;
         syncFromPlatform();
       });
-      $('btn-signin').textContent = P_STR.signIn;
-      $('btn-invite').textContent = P_STR.invite;
       $('btn-signin').addEventListener('click', function () { Platform.signIn(); });
       $('btn-invite').addEventListener('click', inviteFriend);
       syncFromPlatform();
@@ -1315,6 +1387,7 @@
       renderPlatformButtons();
     }
     setBindings(DEFAULT_KEYS);
+    if (root.CPI18n) root.CPI18n.onChange(onLanguageChange);
     Audio.setCaptionCallback(function (text) {
       if (!app.settings.captions) return;
       var c = $('captions');
