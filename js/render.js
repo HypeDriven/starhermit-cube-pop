@@ -23,7 +23,7 @@ const CUBE = 0.94;             // cube edge
 const BASE_Y = 1.05;           // height of the wall's bottom row (sits on the table top, never inside it)
 const POP_MS = 160, FALL_MS = 220, BLAST_MS = 260, SHUFFLE_MS = 450;
 
-const MOTE_COUNT = 70;         // ambient dust motes drifting in the key light
+const MOTE_MAX = 480;          // ambient dust motes drifting in the key light (budget.motes are drawn)
 
 // Colour grade + vignette (display-space colours in, display-space out):
 // gentle S-curve, a touch more saturation, warm highlights / cool shadows.
@@ -47,6 +47,15 @@ const GradeShader = {
     }`
 };
 
+// Run a post pass at a fraction of the frame (per-preset budget). EffectComposer sizes every pass to the
+// full frame in addPass/setSize, so the pass's own setSize is wrapped to apply the scale.
+function atScale(pass, k) {
+  if (!(k > 0 && k < 1)) return pass;
+  const setSize = pass.setSize.bind(pass);
+  pass.setSize = (w, h) => setSize(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
+  return pass;
+}
+
 // Soft round sprite for particles and motes (procedural, authored once).
 function dotTexture() {
   const c = document.createElement('canvas');
@@ -65,10 +74,11 @@ function dotTexture() {
 
 // Low-contrast wallpaper: soft vertical stripes and a scatter of tiny dots,
 // tinted from the theme's wall colour so every theme keeps its mood.
-function wallpaperTexture(wallHex) {
+function wallpaperTexture(wallHex, size = 256) {
   const c = document.createElement('canvas');
-  c.width = c.height = 256;
+  c.width = c.height = size; // per-preset texture variant (budget.texture); drawn in 256-px units
   const g = c.getContext('2d');
+  g.scale(size / 256, size / 256);
   const base = new THREE.Color(wallHex);
   const css = (col) => '#' + col.getHexString();
   g.fillStyle = css(base);
@@ -92,10 +102,11 @@ function wallpaperTexture(wallHex) {
 }
 
 // Floorboards: plank seams with a little per-plank value noise.
-function floorTexture(floorHex) {
+function floorTexture(floorHex, size = 256) {
   const c = document.createElement('canvas');
-  c.width = c.height = 256;
+  c.width = c.height = size; // per-preset texture variant (budget.texture); drawn in 256-px units
   const g = c.getContext('2d');
+  g.scale(size / 256, size / 256);
   const base = new THREE.Color(floorHex);
   let seed = 11;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -119,7 +130,7 @@ function hex(n) { return new THREE.Color(n); }
 // Soft-edged cube: rounded-square extrude with bevel (procedural, authored).
 // The bevel grows the outline, so the shape is inset by it and the finished
 // cube measures exactly `size` (neighbours on the wall never interpenetrate).
-function roundedCubeGeo(size, detailed) {
+function roundedCubeGeo(size, detailed, budget) {
   const b = size * 0.1, r = size * 0.1, h = size / 2 - b - r;
   const s = new THREE.Shape();
   s.moveTo(-h, -h - r);
@@ -130,7 +141,8 @@ function roundedCubeGeo(size, detailed) {
   const g = new THREE.ExtrudeGeometry(s, {
     depth: size - 2 * b, bevelEnabled: true,
     bevelThickness: b, bevelSize: b,
-    bevelSegments: detailed ? 4 : 2, curveSegments: detailed ? 8 : 5
+    // LOD per preset (budget.cubeBevel / cubeCurve); without a budget the old plain/detailed pair
+    bevelSegments: budget ? budget.cubeBevel : (detailed ? 4 : 2), curveSegments: budget ? budget.cubeCurve : (detailed ? 8 : 5)
   });
   g.center();
   return g;
@@ -171,7 +183,8 @@ export class BoardRenderer {
     this.reducedMotion = false;
     this.gpu = this.opts.gpu || '';
     this.detected = this.opts.detected || 'balanced';
-    this.q = Gfx.resolve(this.opts.graphics || {}, this.detected);
+    this.level = this.opts.level != null ? this.opts.level : (window.CPGfxPanel ? window.CPGfxPanel.probe().level : 0);
+    this.q = Gfx.resolve(this.opts.graphics || {}, this.detected, this.level);
     this.size = [0, 0];
     this.pixelRatio = 1;
     this.adaptiveScale = 1;
@@ -328,9 +341,9 @@ export class BoardRenderer {
 
   // Ambient dust motes drifting slowly through the key light (background: animated).
   _initMotes() {
-    const pos = new Float32Array(MOTE_COUNT * 3);
+    const pos = new Float32Array(MOTE_MAX * 3);
     this.moteSeed = [];
-    for (let i = 0; i < MOTE_COUNT; i++) {
+    for (let i = 0; i < MOTE_MAX; i++) {
       const a = Math.sin(i * 12.9898) * 43758.5453, b = Math.sin(i * 78.233) * 12543.123, c = Math.sin(i * 39.425) * 24634.634;
       this.moteSeed.push([a - Math.floor(a), b - Math.floor(b), c - Math.floor(c)]);
     }
@@ -348,7 +361,9 @@ export class BoardRenderer {
   _updateMotes(t) {
     const pos = this.moteGeo.attributes.position.array;
     const w = Math.max(this.cols * SPACING + 3, 8), top = BASE_Y + Math.max(this.rows, 6) * SPACING + 1;
-    for (let i = 0; i < MOTE_COUNT; i++) {
+    const n = Math.min(MOTE_MAX, this.q.budget.motes);
+    this.moteGeo.setDrawRange(0, n);
+    for (let i = 0; i < n; i++) {
       const [a, b, c] = this.moteSeed[i];
       const y = ((b * top + t * (0.08 + a * 0.08)) % top);
       pos[i * 3] = (a - 0.5) * w + Math.sin(t * 0.3 + i) * 0.25;
@@ -360,7 +375,7 @@ export class BoardRenderer {
 
   spawnBurst(x, y, z, colorHex, count) {
     const high = this.q.particles === 'high';
-    const n = Math.min(high ? Math.ceil(count * 1.5) : count, Gfx.PARTICLES[this.q.particles]);
+    const n = Math.min(high ? Math.ceil(count * 1.5) : count, high ? this.q.budget.burst : Gfx.PARTICLES.low);
     const c = hex(colorHex);
     const pos = this.pGeo.attributes.position.array;
     const col = this.pGeo.attributes.color.array;
@@ -401,17 +416,18 @@ export class BoardRenderer {
     }
     const P = palette;
     const detailed = this.q.detail === 'detailed';
-    const mat = (c, rough) => new THREE.MeshStandardMaterial({ color: c, roughness: rough == null ? 0.8 : rough,
+    const tex = this.q.budget.texture;
+    const mat = (c, rough) => this._lit({ color: c, roughness: rough == null ? 0.8 : rough,
       metalness: 0.05, envMapIntensity: 0.2 });
     // floor
     const floorMat = mat(detailed ? 0xffffff : P.floor, 0.9);
-    if (detailed) floorMat.map = floorTexture(P.floor);
+    if (detailed) floorMat.map = floorTexture(P.floor, tex);
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), floorMat);
     floor.rotation.x = -Math.PI / 2; floor.position.y = -0.02; floor.receiveShadow = true;
     this.envGroup.add(floor);
     // back wall
     const wallMat = mat(detailed ? 0xffffff : P.wall, 0.95);
-    if (detailed) wallMat.map = wallpaperTexture(P.wall);
+    if (detailed) wallMat.map = wallpaperTexture(P.wall, tex);
     const wall = new THREE.Mesh(new THREE.PlaneGeometry(60, 30), wallMat);
     wall.position.set(0, 10, -2.2); wall.receiveShadow = true;
     this.envGroup.add(wall);
@@ -452,15 +468,15 @@ export class BoardRenderer {
       // a little stack of toy blocks and a ring toy between the props
       const blockCols = [P.accent, 0xf2c14e, 0x5b8fd4];
       for (let i = 0; i < 3; i++) {
-        const b = new THREE.Mesh(roundedCubeGeo(0.42, true), new THREE.MeshPhysicalMaterial({
-          color: blockCols[i], roughness: 0.45, clearcoat: 0.5, clearcoatRoughness: 0.3, envMapIntensity: 0.25 }));
+        const b = new THREE.Mesh(roundedCubeGeo(0.42, true, this.q.budget), this._lit({
+          color: blockCols[i], roughness: 0.45, clearcoat: 0.5, clearcoatRoughness: 0.3, envMapIntensity: 0.25 }, true));
         b.position.set(-3.2 + (i === 2 ? 0.22 : i * 0.46), 7.97 + (i === 2 ? 0.43 : 0), -1.9);
         b.rotation.y = (i - 1) * 0.25;
         b.castShadow = true;
         this.envGroup.add(b);
       }
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.09, 10, 24), new THREE.MeshPhysicalMaterial({
-        color: 0x8fd48f, roughness: 0.4, clearcoat: 0.5, envMapIntensity: 0.25 }));
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.09, 10, 24), this._lit({
+        color: 0x8fd48f, roughness: 0.4, clearcoat: 0.5, envMapIntensity: 0.25 }, true));
       ring.position.set(3.4, 8.1, -1.9); ring.rotation.x = -Math.PI / 2 + 0.25;
       ring.castShadow = true;
       this.envGroup.add(ring);
@@ -477,9 +493,12 @@ export class BoardRenderer {
     if (key === this._gfxKey) return; // unrelated settings changed
     this._gfxKey = key;
     const before = this.q;
-    this.q = Gfx.resolve(saved || {}, this.detected);
+    this.q = Gfx.resolve(saved || {}, this.detected, this.level);
     this._applyGraphics();
-    if (this.palette && (before.detail !== this.q.detail)) {
+    // Asset variants (material class, cube LOD, texture size) are built into the meshes: rebuild them.
+    const pb = before.budget || {}, nb = this.q.budget;
+    const assets = ['material', 'cubeCurve', 'cubeBevel', 'texture'].some(k => pb[k] !== nb[k]);
+    if (this.palette && (before.detail !== this.q.detail || assets)) {
       this.setTheme(this.palette, this._colorDefs || [], this._hc);
     }
   }
@@ -501,11 +520,13 @@ export class BoardRenderer {
     this.ambient.intensity = ibl ? 0.1 : 0.25;
     this.rimLight.intensity = g.detail === 'detailed' ? 0.6 : 0;
     this.motes.visible = g.background === 'animated';
+    this._updateMotes(this.clock || 0);
     // High particles: larger soft round confetti; Low keeps the original cheap squares.
     this.pMat.map = g.particles === 'high' ? this._dotTex : null;
     this.pMat.size = g.particles === 'high' ? 0.16 : 0.09;
     this.pMat.needsUpdate = true;
     this.renderer.domElement.dataset.gfxPreset = g.preset;
+    document.body.classList.toggle('gfx-rounded-view', !!g.budget.roundedView);
     this.adaptiveScale = 1;
     this._frames = [];
     this.postKey = null; // rebuild the post chain on the next frame
@@ -518,11 +539,27 @@ export class BoardRenderer {
     }
   }
 
+  /**
+   * Lit material in the preset budget's class: Lambert on Low, Standard on Balanced, Physical (clearcoat)
+   * on High/Ultra where `physical` is asked for. Parameters a class lacks are dropped (no warnings).
+   */
+  _lit(params, physical) {
+    const kind = this.q.budget.material;
+    const { roughness, metalness, clearcoat, clearcoatRoughness, envMapIntensity, ...rest } = params;
+    if (kind === 'lambert') return new THREE.MeshLambertMaterial(rest);
+    if (kind === 'physical' && physical) return new THREE.MeshPhysicalMaterial(params);
+    const sp = Object.assign({}, rest);
+    if (roughness != null) sp.roughness = roughness;
+    if (metalness != null) sp.metalness = metalness;
+    if (envMapIntensity != null) sp.envMapIntensity = envMapIntensity;
+    return new THREE.MeshStandardMaterial(sp);
+  }
+
   /** What the settings panel shows: GPU, auto choice, resolved tiers, cost and frame rate. */
   graphicsInfo() {
     const px = [Math.round(this.size[0] * this.pixelRatio), Math.round(this.size[1] * this.pixelRatio)];
     return {
-      gpu: this.gpu || '', detected: this.detected, resolved: this.q,
+      gpu: this.gpu || '', level: this.level, detected: this.detected, resolved: this.q,
       summary: Gfx.describe(this.q, px), pixels: px,
       fps: Math.round(this.fps || 0), adaptiveScale: Math.round(this.adaptiveScale * 100) / 100,
       postFailed: !!this.postFailed
@@ -560,7 +597,7 @@ export class BoardRenderer {
       composer.addPass(new RenderPass(this.scene, this.camera));
       if (g.ao !== 'off') {
         const hi = g.ao === 'high';
-        const ao = new GTAOPass(this.scene, this.camera, pw, ph);
+        const ao = atScale(new GTAOPass(this.scene, this.camera, pw, ph), g.budget.aoRes);
         ao.output = GTAOPass.OUTPUT.Default;
         ao.blendIntensity = 0.85;
         ao.updateGtaoMaterial({ radius: 0.45, distanceExponent: 1.2, thickness: 1.0, scale: 1.0, samples: hi ? 16 : 8 });
@@ -568,7 +605,7 @@ export class BoardRenderer {
         composer.addPass(ao);
       }
       // High threshold: only fuse sparks, sparkles and hot highlights bloom.
-      if (g.bloom === 'on') composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.45, 0.4, 0.9));
+      if (g.bloom === 'on') composer.addPass(atScale(new UnrealBloomPass(new THREE.Vector2(w, h), 0.45, 0.4, 0.9), g.budget.bloomRes));
       if (g.grade === 'on') composer.addPass(new ShaderPass(GradeShader));
       composer.addPass(new OutputPass());
       if (g.antialias === 'smaa') composer.addPass(new SMAAPass(pw, ph));
@@ -638,14 +675,14 @@ export class BoardRenderer {
     if (!this.rows) return;
     const cap = this.rows * this.cols;
     const detailed = this.q.detail === 'detailed';
-    const cubeGeo = roundedCubeGeo(CUBE, detailed);
+    const cubeGeo = roundedCubeGeo(CUBE, detailed, this.q.budget);
     this._cubeGeo = cubeGeo;
     for (let i = 0; i < this.colors.length; i++) {
       // Detailed: soft-touch toy plastic with a thin clearcoat that catches the room light.
       const cubeMat = detailed
-        ? new THREE.MeshPhysicalMaterial({ color: this.colors[i], roughness: 0.5, metalness: 0,
-          clearcoat: 0.4, clearcoatRoughness: 0.18, envMapIntensity: 0.22 })
-        : new THREE.MeshStandardMaterial({ color: this.colors[i], roughness: 0.55, metalness: 0.05, envMapIntensity: 0.25 });
+        ? this._lit({ color: this.colors[i], roughness: 0.5, metalness: 0,
+          clearcoat: 0.4, clearcoatRoughness: 0.18, envMapIntensity: 0.22 }, true)
+        : this._lit({ color: this.colors[i], roughness: 0.55, metalness: 0.05, envMapIntensity: 0.25 });
       const m = new THREE.InstancedMesh(cubeGeo, cubeMat, cap);
       m.castShadow = true; m.receiveShadow = true;
       m.count = 0;
@@ -653,7 +690,7 @@ export class BoardRenderer {
       this.boardGroup.add(m);
       this.cubeMeshes.push(m);
       const cm = new THREE.InstancedMesh(charmGeo(i),
-        new THREE.MeshStandardMaterial({ color: 0xfff6e8, roughness: 0.35, metalness: 0.1, envMapIntensity: 0.3 }), cap);
+        this._lit({ color: 0xfff6e8, roughness: 0.35, metalness: 0.1, envMapIntensity: 0.3 }), cap);
       cm.castShadow = detailed;
       cm.count = 0;
       cm.raycast = function () {};
@@ -692,13 +729,13 @@ export class BoardRenderer {
 
   _makeSpecialMesh(s, colorIdx, p) {
     const g = new THREE.Group();
-    const base = new THREE.Mesh(roundedCubeGeo(CUBE * 0.9, this.q.detail === 'detailed'),
-      new THREE.MeshPhysicalMaterial({ color: this.colors[colorIdx], roughness: 0.4, metalness: 0.1,
-        clearcoat: this.q.detail === 'detailed' ? 0.5 : 0, clearcoatRoughness: 0.2, envMapIntensity: 0.25 }));
+    const base = new THREE.Mesh(roundedCubeGeo(CUBE * 0.9, this.q.detail === 'detailed', this.q.budget),
+      this._lit({ color: this.colors[colorIdx], roughness: 0.4, metalness: 0.1,
+        clearcoat: this.q.detail === 'detailed' ? 0.5 : 0, clearcoatRoughness: 0.2, envMapIntensity: 0.25 }, true));
     base.castShadow = true;
     g.add(base);
     let top;
-    const dark = new THREE.MeshPhysicalMaterial({ color: 0x4a4038, roughness: 0.35, clearcoat: 0.6, clearcoatRoughness: 0.2, envMapIntensity: 0.4 });
+    const dark = this._lit({ color: 0x4a4038, roughness: 0.35, clearcoat: 0.6, clearcoatRoughness: 0.2, envMapIntensity: 0.4 }, true);
     if (s === 3) { // bomb: sphere + fuse with a glowing spark (bloom catches it)
       top = new THREE.Mesh(new THREE.SphereGeometry(0.34, 18, 12), dark);
       const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.22, 6),

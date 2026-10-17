@@ -2,18 +2,48 @@
 'use strict';
 const test = require('node:test');
 const assert = require('assert');
+globalThis.StarHermitGpu = require('../gpu-level.js');
 const G = require('../js/gfx.js');
 
-test('detectPreset maps GPU strings to tiers', () => {
-  assert.strictEqual(G.detectPreset('ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)'), 'low');
-  assert.strictEqual(G.detectPreset('llvmpipe (LLVM 15.0.7, 256 bits)'), 'low');
-  assert.strictEqual(G.detectPreset('ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 Direct3D11 vs_5_0 ps_5_0)'), 'high');
-  assert.strictEqual(G.detectPreset('Apple M2 Pro'), 'high');
-  assert.strictEqual(G.detectPreset('ANGLE (Intel, Intel(R) UHD Graphics 620 Direct3D11)'), 'balanced');
-  assert.strictEqual(G.detectPreset('Adreno (TM) 640'), 'balanced');
-  assert.strictEqual(G.detectPreset(''), 'balanced');
-  assert.strictEqual(G.detectPreset('Apple M1', true), 'balanced', 'touch devices cap Auto at balanced');
-  assert.strictEqual(G.detectPreset('SwiftShader', true), 'low');
+const desk = { webgl: true, webgl2: true, cores: 8, memoryGb: 8 };
+const phone = { webgl: true, webgl2: true, mobile: true, cores: 8, memoryGb: 8 };
+
+test('hardware level → preset: Low 0, Balanced 4, High 10, Ultra 17', () => {
+  assert.strictEqual(G.detectPreset('ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)', desk), 'low');
+  assert.strictEqual(G.detectLevel('llvmpipe (LLVM 15.0.7, 256 bits)', desk), 0);
+  assert.strictEqual(G.detectPreset('ANGLE (AMD, AMD Radeon(TM) Graphics Direct3D11 vs_5_0 ps_5_0)', desk), 'low');
+  assert.strictEqual(G.detectPreset('ANGLE (Intel, Intel(R) UHD Graphics 620 Direct3D11)', desk), 'low');
+  assert.strictEqual(G.detectPreset('ANGLE (Intel, Intel(R) Iris(R) Xe Graphics Direct3D11)', desk), 'balanced');
+  assert.strictEqual(G.detectPreset('ANGLE (NVIDIA, NVIDIA GeForce GTX 1070 Direct3D11 vs_5_0 ps_5_0)', desk), 'high');
+  assert.strictEqual(G.detectPreset('ANGLE (NVIDIA, NVIDIA GeForce RTX 4080 Direct3D11 vs_5_0 ps_5_0)', desk), 'ultra');
+  assert.strictEqual(G.detectLevel('ANGLE (NVIDIA, NVIDIA GeForce RTX 5090 Direct3D11 vs_5_0 ps_5_0)', desk), 20);
+  assert.strictEqual(G.detectPreset('ANGLE (NVIDIA, NVIDIA GeForce RTX 5090 Direct3D11 vs_5_0 ps_5_0)', desk), 'ultra');
+  assert.strictEqual(G.detectPreset('', desk), 'balanced');
+  assert.strictEqual(G.presetForLevel(3), 'low');
+  assert.strictEqual(G.presetForLevel(16), 'high');
+});
+
+test('phones and tablets are capped at Balanced; software GPUs stay Low', () => {
+  assert.strictEqual(G.detectPreset('Adreno (TM) 740', phone), 'balanced');
+  assert.ok(G.detectLevel('Adreno (TM) 740', phone) <= 9);
+  assert.strictEqual(G.detectPreset('NVIDIA GeForce RTX 5090', phone), 'balanced');
+  assert.strictEqual(G.detectPreset('Mali-G77', phone), 'low');
+  assert.strictEqual(G.detectPreset('SwiftShader', phone), 'low');
+});
+
+test('every preset has an explicit budget that grows from Low to Ultra and scales with the level', () => {
+  const order = ['low', 'balanced', 'high', 'ultra'];
+  const keys = ['material', 'cubeCurve', 'cubeBevel', 'texture', 'motes', 'burst', 'bloomRes', 'aoRes'];
+  const mats = ['lambert', 'standard', 'physical'];
+  order.forEach(p => keys.forEach(k => assert.ok(G.BUDGETS[p][k] != null, p + '.' + k)));
+  for (let i = 1; i < order.length; i++) {
+    keys.forEach(k => { if (typeof G.BUDGETS.low[k] === 'number') assert.ok(G.BUDGETS[order[i]][k] >= G.BUDGETS[order[i - 1]][k], order[i] + '.' + k); });
+    assert.ok(mats.indexOf(G.BUDGETS[order[i]].material) >= mats.indexOf(G.BUDGETS[order[i - 1]].material));
+  }
+  assert.deepStrictEqual(G.resolve({ preset: 'ultra' }, 'low', 0).budget, G.resolve({ preset: 'ultra' }, 'ultra', 17).budget);
+  assert.ok(G.budgetFor('low', 3).motes > G.budgetFor('low', 0).motes, 'counts scale up with the level');
+  assert.ok(G.budgetFor('low', 20).motes <= 4 * G.BUDGETS.low.motes, 'never more than 4×');
+  assert.strictEqual(G.resolve({ preset: 'balanced' }, 'low').scale, 0.9);
 });
 
 test('resolve: auto uses detected preset, explicit preset wins', () => {

@@ -256,7 +256,7 @@ async function runPass(browser, passName, contextOpts) {
       await page.selectOption('#set-gfx-bloom', 'off');
       await page.check('#set-gfx-fps');
       const summary = await page.textContent('#gfx-summary');
-      if (/Bloom/.test(summary) || !/SMAA/.test(summary)) throw new Error('summary does not reflect override: ' + summary);
+      if (/Bloom/.test(summary) || !/SMAA/.test(summary) || !/ · Level 0 · /.test(summary)) throw new Error('summary does not reflect override: ' + summary);
       await page.screenshot({ path: shot('graphics', passName) });
       await page.reload({ waitUntil: 'load' });
       await page.waitForSelector('#screen-title:not([hidden])');

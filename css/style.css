@@ -154,7 +154,10 @@ html.ui-scaled #screen-title { min-height: 100%; }
 #rail-left { grid-area: left; background: var(--panel); border-radius: var(--radius); padding: 10px; margin: 8px 0 8px 8px; overflow: auto; }
 #rail-right { grid-area: right; background: var(--panel); border-radius: var(--radius); padding: 10px; margin: 8px 8px 8px 0; align-self: start; }
 #playfield { grid-area: play; position: relative; min-height: 0; margin: 8px 0; }
-#gl-container { position: absolute; inset: 0; border-radius: var(--radius); overflow: hidden; }
+#gl-container { position: absolute; inset: 0; overflow: hidden; }
+/* Rounded corners clip the live WebGL layer through a mask that is re-composited every frame: only
+   where the graphics budget allows it (High/Ultra). */
+body.gfx-rounded-view #gl-container { border-radius: var(--radius); }
 #gl-container canvas { display: block; width: 100%; height: 100%; }
 #action-tray {
   grid-area: tray; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;

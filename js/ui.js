@@ -598,7 +598,7 @@
     if (app.renderer || app.webglFailed) return;
     try {
       app.renderer = app.createRenderer($('gl-container'), {
-        graphics: app.settings.graphics, gpu: app.gfx.gpu, detected: app.gfx.detected,
+        graphics: app.settings.graphics, gpu: app.gfx.gpu, detected: app.gfx.detected, level: app.gfx.level,
         onPick: function (cell) { tryPop(cell.r, cell.c); },
         onHover: function (cell) {
           if (!app.session || app.state !== 'active' || !app.renderer) return;

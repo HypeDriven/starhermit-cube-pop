@@ -15,7 +15,7 @@
       reflections: 'Reflections', particles: 'Particles', background: 'Ambient motion', detail: 'Studio detail',
       tier_off: 'Off', tier_on: 'On', tier_low: 'Low', tier_medium: 'Medium', tier_high: 'High',
       tier_static: 'Still', tier_animated: 'Animated', tier_plain: 'Plain', tier_detailed: 'Detailed',
-      adaptive: 'Adaptive resolution', show_fps: 'Show frame rate', unknown_gpu: 'Unknown GPU',
+      adaptive: 'Adaptive resolution', show_fps: 'Show frame rate', unknown_gpu: 'Unknown GPU', level: 'Level {n}',
       no_effects: 'no effects', pending: 'resolution shown once the studio opens',
       post_note: 'Post-processing is unavailable on this device, so the studio renders without it.'
     },
@@ -29,7 +29,7 @@
       reflections: 'Reflejos', particles: 'Partículas', background: 'Movimiento ambiental', detail: 'Detalle del estudio',
       tier_off: 'No', tier_on: 'Sí', tier_low: 'Bajo', tier_medium: 'Medio', tier_high: 'Alto',
       tier_static: 'Quieto', tier_animated: 'Animado', tier_plain: 'Simple', tier_detailed: 'Detallado',
-      adaptive: 'Resolución adaptable', show_fps: 'Mostrar cuadros por segundo', unknown_gpu: 'GPU desconocida',
+      adaptive: 'Resolución adaptable', show_fps: 'Mostrar cuadros por segundo', unknown_gpu: 'GPU desconocida', level: 'Nivel {n}',
       no_effects: 'sin efectos', pending: 'la resolución aparece al abrir el estudio',
       post_note: 'El posprocesado no está disponible en este dispositivo; el estudio se dibuja sin él.'
     },
@@ -44,7 +44,7 @@
       reflections: 'Spiegelungen', particles: 'Partikel', background: 'Umgebungsbewegung', detail: 'Studio-Details',
       tier_off: 'Aus', tier_on: 'An', tier_low: 'Niedrig', tier_medium: 'Mittel', tier_high: 'Hoch',
       tier_static: 'Ruhig', tier_animated: 'Animiert', tier_plain: 'Schlicht', tier_detailed: 'Detailliert',
-      adaptive: 'Adaptive Auflösung', show_fps: 'Bildrate anzeigen', unknown_gpu: 'Unbekannte GPU',
+      adaptive: 'Adaptive Auflösung', show_fps: 'Bildrate anzeigen', unknown_gpu: 'Unbekannte GPU', level: 'Stufe {n}',
       no_effects: 'keine Effekte', pending: 'Auflösung erscheint, sobald das Studio geöffnet ist',
       post_note: 'Nachbearbeitung ist auf diesem Gerät nicht verfügbar; das Studio wird ohne sie gezeichnet.'
     },
@@ -55,7 +55,7 @@
       reflections: 'Reflets', particles: 'Particules', background: 'Mouvement ambiant', detail: 'Détails du studio',
       tier_off: 'Désactivé', tier_on: 'Activé', tier_low: 'Faible', tier_medium: 'Moyen', tier_high: 'Élevé',
       tier_static: 'Immobile', tier_animated: 'Animé', tier_plain: 'Simple', tier_detailed: 'Détaillé',
-      adaptive: 'Résolution adaptative', show_fps: 'Afficher les images par seconde', unknown_gpu: 'GPU inconnu',
+      adaptive: 'Résolution adaptative', show_fps: 'Afficher les images par seconde', unknown_gpu: 'GPU inconnu', level: 'Niveau {n}',
       no_effects: 'aucun effet', pending: 'la résolution s’affiche à l’ouverture du studio',
       post_note: 'Le post-traitement est indisponible sur cet appareil ; le studio s’affiche sans lui.'
     },
@@ -69,7 +69,7 @@
       reflections: 'Reflexos', particles: 'Partículas', background: 'Movimento ambiente', detail: 'Detalhes do estúdio',
       tier_off: 'Desligado', tier_on: 'Ligado', tier_low: 'Baixo', tier_medium: 'Médio', tier_high: 'Alto',
       tier_static: 'Parado', tier_animated: 'Animado', tier_plain: 'Simples', tier_detailed: 'Detalhado',
-      adaptive: 'Resolução adaptativa', show_fps: 'Mostrar taxa de quadros', unknown_gpu: 'GPU desconhecida',
+      adaptive: 'Resolução adaptativa', show_fps: 'Mostrar taxa de quadros', unknown_gpu: 'GPU desconhecida', level: 'Nível {n}',
       no_effects: 'sem efeitos', pending: 'a resolução aparece quando o estúdio abrir',
       post_note: 'O pós-processamento não está disponível neste aparelho; o estúdio é desenhado sem ele.'
     },
@@ -80,7 +80,7 @@
       reflections: 'Riflessi', particles: 'Particelle', background: 'Movimento ambientale', detail: 'Dettagli dello studio',
       tier_off: 'No', tier_on: 'Sì', tier_low: 'Basso', tier_medium: 'Medio', tier_high: 'Alto',
       tier_static: 'Fermo', tier_animated: 'Animato', tier_plain: 'Semplice', tier_detailed: 'Dettagliato',
-      adaptive: 'Risoluzione adattiva', show_fps: 'Mostra frame rate', unknown_gpu: 'GPU sconosciuta',
+      adaptive: 'Risoluzione adattiva', show_fps: 'Mostra frame rate', unknown_gpu: 'GPU sconosciuta', level: 'Livello {n}',
       no_effects: 'nessun effetto', pending: 'la risoluzione appare quando lo studio è aperto',
       post_note: 'La post-elaborazione non è disponibile su questo dispositivo; lo studio viene disegnato senza.'
     }
@@ -132,7 +132,10 @@
     } catch (e) { /* no WebGL: detection falls back to balanced */ }
     var mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ||
       (navigator.maxTouchPoints > 1 && window.matchMedia && matchMedia('(pointer: coarse)').matches);
-    probed = { gpu: gpu, detected: Gfx.detectPreset(gpu, mobile), mobile: mobile };
+    // StarHermit hardware level → Auto preset (SwiftShader = level 0 → Low; phones cap at Balanced).
+    var system = root.StarHermitGpu ? root.StarHermitGpu.detectSystem() : {};
+    var level = Gfx.detectLevel(gpu, Object.assign({}, system, { mobile: !!system.mobile || mobile }));
+    probed = { gpu: gpu, level: level, detected: Gfx.presetForLevel(level), mobile: mobile };
     return probed;
   }
 
@@ -147,7 +150,7 @@
     if (r.bloom === 'on') fx.push(t('bloom'));
     if (r.reflections === 'on') fx.push(t('reflections'));
     if (r.antialias !== 'off') fx.push(r.antialias.toUpperCase());
-    var parts = [gpu || t('unknown_gpu'), fx.length ? fx.join(', ') : t('no_effects')];
+    var parts = [gpu || t('unknown_gpu'), t('level', { n: probe().level }), fx.length ? fx.join(', ') : t('no_effects')];
     parts.push(info && info.pixels && info.pixels[0] ? info.pixels[0] + '×' + info.pixels[1] + ' px' : t('pending'));
     if (info && info.fps && r.showFps) parts.push(info.fps + ' fps');
     return parts.join(' · ');
@@ -166,7 +169,7 @@
     box.setAttribute('lang', locale);
     box.querySelectorAll('[data-gfx-i18n]').forEach(function (n) { n.textContent = t(n.dataset.gfxI18n); });
 
-    function resolved() { return Gfx.resolve(get(), p.detected); }
+    function resolved() { return Gfx.resolve(get(), p.detected, p.level); }
 
     var q = $('set-quality');
     q.innerHTML = '';
