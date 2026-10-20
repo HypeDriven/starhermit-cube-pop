@@ -47,9 +47,30 @@
     put('key-camera', T('{keys} (reset)', { keys: keysText('camera') }));
   }
 
-  function toast(msg, ms) {
+  // During a round the toast and captions sit just above the action tray, never
+  // on its buttons; null when the tray is not shown. In the zoomed layer's px.
+  function trayClearance() {
+    var tray = $('action-tray');
+    if (!tray || !tray.offsetParent) return null;
+    var z = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 1;
+    return Math.max(0, innerHeight - tray.getBoundingClientRect().top) / z;
+  }
+
+  // The toast is click-through (css/style.css): a press on a HUD button under it
+  // always lands. `selectable` (e.g. an invite link) stays selectable inside it.
+  function toast(msg, ms, selectable) {
     var t = $('toast');
-    t.textContent = msg; t.hidden = false;
+    var at = selectable ? msg.lastIndexOf(selectable) : -1;
+    t.textContent = at < 0 ? msg : msg.slice(0, at);
+    if (at >= 0) {
+      var s = document.createElement('span');
+      s.setAttribute('data-selectable', '');
+      s.textContent = selectable;
+      t.append(s, msg.slice(at + selectable.length));
+    }
+    var clear = trayClearance();
+    t.style.bottom = clear == null ? '' : (clear + 8) + 'px';
+    t.hidden = false;
     clearTimeout(t._timer);
     t._timer = setTimeout(function () { t.hidden = true; }, ms || 2600);
   }
@@ -350,7 +371,7 @@
   function inviteFriend() {
     var link = root.CPPlatform.inviteLink();
     if (!link) return;
-    var fail = function () { toast(T('Could not copy — invite link: {link}', { link: link }), 6000); };
+    var fail = function () { toast(T('Could not copy — invite link: {link}', { link: link }), 6000, link); };
     try { navigator.clipboard.writeText(link).then(function () { toast(T('Invite link copied to the clipboard.')); }, fail); } catch (e) { fail(); }
   }
 
@@ -1391,6 +1412,8 @@
     Audio.setCaptionCallback(function (text) {
       if (!app.settings.captions) return;
       var c = $('captions');
+      var clear = trayClearance();
+      c.style.bottom = clear == null ? '' : (clear + 54) + 'px';
       c.textContent = text;
       clearTimeout(c._t);
       c._t = setTimeout(function () { c.textContent = ''; }, 1800);

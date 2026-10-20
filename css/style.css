@@ -212,7 +212,9 @@ body.left-handed #action-tray { flex-direction: row-reverse; }
   position: fixed; left: 50%; bottom: calc(24px + var(--sab)); transform: translateX(-50%);
   background: var(--ink); color: #fff; padding: 10px 18px; border-radius: 24px;
   z-index: 50; max-width: calc(80vw / var(--ui-scale, 1));
+  pointer-events: none; /* click-through: never swallows a press on the buttons under it */
 }
+.toast a, .toast input, .toast [data-selectable] { pointer-events: auto; user-select: text; }
 .captions {
   position: fixed; left: 50%; bottom: calc(70px + var(--sab)); transform: translateX(-50%);
   background: #000c; color: #fff; padding: 6px 14px; border-radius: 8px;

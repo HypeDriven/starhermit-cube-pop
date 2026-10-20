@@ -141,6 +141,7 @@ Cube Pop is the feeling of sweeping a shelf of toy blocks off a table with one f
 - **Large screens:** `ui-scale.js` sets `--ui-scale` on `<html>` (1 up to a 1600×1000 viewport, then the smaller of width/1600 and height/1000, capped at 2.5; 2560×1440 → 1.44, 3840×2160 → 2.16). `#topbar`, `#main` (every screen, the game grid, overlays, toast), captions and the FPS meter are CSS-`zoom`ed by it with vw/vh lengths divided by it, and the title block is centred vertically; the studio canvas and title mosaic multiply their pixel ratio by it so they stay sharp.
 - **Overlays:** countdown (`3 2 1 Pop!`, skipped under reduced motion), pause dialog (Resume, Settings, Help, Restart, Leave), results dialog (banner on wins, headline, breakdown table, stars, daily submit box, Retry / Next / Menu, replay envelope `<details>`), WebGL-fail card (continue with the visible grid).
 - **Never cut off:** the action tray (bottom safe area), the goal rail, HUD score/moves/time, overlay buttons (`overlay-card` scrolls at `max-height: 90vh`), toasts (`max-width: 80vw`).
+- **Toasts and captions:** click-through (`pointer-events: none`; only a selectable invite link inside a toast takes the pointer) and, during a round, placed just above the action tray (`ui.js:trayClearance`), so they never hide or swallow a press on Hint/Undo/Pause/Camera.
 
 ## 7. Art direction
 
