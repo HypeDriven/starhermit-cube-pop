@@ -1,0 +1,16 @@
+# Touch: journey stage 1 by touch — Play tapped, the top-left green trio tapped on the wall
+# (it pops: the first-pop achievement), then the tray's Pause and Leave round.
+until 300 Cube Pop
+frames 30
+touch Play: First Pops
+until 120 Goals
+frames 150
+touch 385 207
+until 120 Achievement: First Pop
+frames 60
+save touch-popped
+touch Pause
+until 60 Leave round
+frames 10
+touch =Leave round
+until 120 Resume saved round

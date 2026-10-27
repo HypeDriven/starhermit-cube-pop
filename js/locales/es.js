@@ -62,7 +62,6 @@
     "{color}, group of {n}": "{color}, grupo de {n}",
     "Row {r} column {c}: {desc}": "Fila {r}, columna {c}: {desc}",
     "empty": "vacía",
-    "Graphics context lost — switching to grid mode. Your round is safe.": "Se perdió el contexto gráfico: cambiando al modo cuadrícula. Tu ronda está a salvo.",
     "Daily {date}": "Diario {date}",
     "Fill the goals to win.": "Cumple los objetivos para ganar.",
     "How to play": "Cómo jugar",
@@ -114,7 +113,6 @@
     "Camera reset.": "Cámara restablecida.",
     "Replay copied.": "Repetición copiada.",
     "Select the replay text to copy.": "Selecciona el texto de la repetición para copiarlo.",
-    "Grid mode active. Use the grid buttons to play.": "Modo cuadrícula activo. Usa los botones de la cuadrícula para jugar.",
     "Hints are disabled in this mode.": "Las pistas están desactivadas en este modo.",
     "This group forges a bomb.": "Este grupo crea una bomba.",
     "This group forges a rocket.": "Este grupo crea un cohete.",
@@ -325,7 +323,6 @@
     "Cancel": "Cancelar"
   };
   L['es-ES'] = {
-    "Graphics context lost — switching to grid mode. Your round is safe.": "Se ha perdido el contexto gráfico: cambiando al modo cuadrícula. Tu ronda está a salvo.",
     "Could not copy — invite link: {link}": "No se ha podido copiar. Enlace de invitación: {link}",
     "Could not save ({error}).": "No se ha podido guardar ({error}).",
     "The round is over.": "La ronda ha terminado.",

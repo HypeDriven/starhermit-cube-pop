@@ -107,7 +107,7 @@ export function openPage(screen: "settings" | "help"): void {
   click();
   app.returnTo = app.session && app.phase === "paused" ? "pause" : "title";
   if (app.returnTo === "pause") app.overlay = null;
-  show(screen, screen === "settings" ? "set-captions" : "btn-back");
+  show(screen, screen === "settings" ? "set-captions" : null);
   app.phase = app.returnTo === "pause" ? "paused" : "mode-select";
 }
 export function back(): void {
@@ -649,21 +649,26 @@ onAction((e) => {
 });
 
 // Wall taps pop a group (short and stationary: within 12 px and 600 ms); a longer drag orbits the camera.
+// The playfield is the part of the window the HUD leaves (its rails and tray sit outside it), so a press
+// there is the wall's; ui.pointerOver() is not asked, as the cubes' accessibility targets (ui.target)
+// count as widgets there. Presses are queued and decided after the frame's UI is built, when the
+// playfield's rectangle is this frame's.
 let down: { x: number; y: number; at: number; lastX: number; lastY: number; dragging: boolean } | null = null;
 let lastTouch = -1e9;
-function boardDown(x: number, y: number): void {
-  down = inPlayfield(x, y) && !app.overlay && !ui.pointerOver() ? { x, y, at: now(), lastX: x, lastY: y, dragging: false } : null;
-}
+const queued: { kind: "down" | "move" | "up"; x: number; y: number }[] = [];
 function inPlayfield(x: number, y: number): boolean {
   const v = render.playfield();
   return app.screen === "game" && !!app.session && x >= v.x && y >= v.y && x <= v.x + v.w && y <= v.y + v.h;
+}
+function boardDown(x: number, y: number): void {
+  down = inPlayfield(x, y) && !app.overlay ? { x, y, at: now(), lastX: x, lastY: y, dragging: false } : null;
 }
 function boardMove(x: number, y: number): void {
   if (down) {
     if (!down.dragging && Math.hypot(x - down.x, y - down.y) > 12 * frame().scale) down.dragging = true;
     if (down.dragging) { render.orbitBy(x - down.lastX, y - down.lastY, frame().scale); down.lastX = x; down.lastY = y; return; }
   }
-  if (!canAct() || ui.pointerOver()) { if (app.hoverCell) { app.hoverCell = null; previewAt(app.focus.r, app.focus.c); } return; }
+  if (!canAct() || !inPlayfield(x, y)) { if (app.hoverCell) { app.hoverCell = null; previewAt(app.focus.r, app.focus.c); } return; }
   const cell = render.pick(x, y);
   const same = cell && app.hoverCell && cell.r === app.hoverCell.r && cell.c === app.hoverCell.c;
   if (same) return;
@@ -678,18 +683,26 @@ function boardUp(x: number, y: number): void {
   const cell = render.pick(x, y);
   if (cell) { ui.setFocus(null); app.focus = cell; render.setFocusCell(cell.r, cell.c); tryPop(cell.r, cell.c); }
 }
+/** The frame's queued presses, once its UI is built (from onRender). */
+function boardInput(): void {
+  for (const q of queued.splice(0)) {
+    if (q.kind === "down") boardDown(q.x, q.y);
+    else if (q.kind === "move") boardMove(q.x, q.y);
+    else boardUp(q.x, q.y);
+  }
+}
 onPointerButton((e) => {
   if (e.button !== 0 || now() - lastTouch < 0.6) return;
-  if (e.pressed) boardDown(e.x, e.y); else boardUp(e.x, e.y);
+  queued.push({ kind: e.pressed ? "down" : "up", x: e.x, y: e.y });
 });
-onPointerMove((x, y) => { if (now() - lastTouch >= 0.6) boardMove(x, y); });
+onPointerMove((x, y) => { if (now() - lastTouch >= 0.6) queued.push({ kind: "move", x, y }); });
 onTouch((e) => {
   if (!e.primary || e.control) return;
   lastTouch = now();
-  if (e.phase === "start") boardDown(e.x, e.y);
-  else if (e.phase === "move") boardMove(e.x, e.y);
-  else if (e.phase === "end") boardUp(e.x, e.y);
-  else down = null;
+  if (e.phase === "start") queued.push({ kind: "down", x: e.x, y: e.y });
+  else if (e.phase === "move") queued.push({ kind: "move", x: e.x, y: e.y });
+  else if (e.phase === "end") queued.push({ kind: "up", x: e.x, y: e.y });
+  else { queued.length = 0; down = null; }
 });
 
 // ------------------------------------------------------------------ boot and lifecycle
@@ -782,5 +795,6 @@ onUpdate((dt) => {
 });
 onRender(() => {
   drawScreens();
+  boardInput();
   render.update(frameDt);
 });

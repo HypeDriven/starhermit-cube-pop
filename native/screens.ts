@@ -199,7 +199,7 @@ function page(key: string, L: Layout, top: number, maxW: number, build: (w: numb
       const r = ui.column(`${key}-col`, () => build(pw - (scroll ? 12 : 0)), { width: pw, spacing: 10, padding: { top: pad, bottom: pad } });
       lastHeight.set(key, r.height / L.sc);
     };
-    const fresh = frame().frame - app.openedFrame <= 2;
+    const fresh = frame().frame - app.openedFrame <= 5;
     if (scroll) ui.scrollArea(`${key}-scroll`, { width: L.lw, height: avail }, () => ui.column(`${key}-sc`, body, { width: L.lw - 12, align: "center" }), fresh ? { scrollTo: { top: 0 } } : undefined);
     else ui.column(`${key}-center`, body, { width: L.lw, align: "center", ...(key === "title" ? { height: avail, justify: "start" as const } : {}) });
   }, { width: L.lw });
@@ -359,7 +359,7 @@ function dailyScreen(w: number): void {
   flow("daily-play", [{ id: "btn-daily-play", text: T("Play today's challenge"), style: ["btn", "btn-primary"], act: () => { click(); startDaily(); } }], w, "start");
   heading("h3", T("Today's board (this device)"), w);
   const entries = Sess.readLS<Record<string, DailyEntry[]>>(Sess.LS.dailyBoards, {})[cfg.date!] ?? [];
-  boardList("daily-board", entries.map((e) => `${e.name} — ` + T(e.won ? "{score} pts ({moves} moves, goals complete)" : "{score} pts ({moves} moves)", { score: e.score, moves: e.moves })),
+  boardList("daily-board", entries.map((e) => `${e.name} — ` + (e.won ? T("{score} pts ({moves} moves, goals complete)", { score: e.score, moves: e.moves }) : T("{score} pts ({moves} moves)", { score: e.score, moves: e.moves }))),
     T("No scores on this device yet today."), w);
 }
 function boardList(id: string, lines: string[], empty: string, w: number): void {
