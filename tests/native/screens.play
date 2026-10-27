@@ -1,0 +1,70 @@
+# Every screen from the title and back: Journey, Daily Challenge, Practice, Challenge, Score Chase
+# (and a run started), Learn, Achievements, Settings (the captions option, the reset question),
+# Help; Escape backs out of the list screens.
+until 300 Cube Pop
+frames 120
+expect Journey 0/40
+save title
+click =Daily Challenge
+until 60 Today's board (this device)
+expect No scores on this device yet today.
+save daily
+click =Back
+until 60 Play: First Pops
+click =Practice
+until 60 Unranked
+save practice
+key Escape 1
+until 60 Play: First Pops
+frames 5
+click =Challenge
+until 60 Constrained goals
+expect Two-Tone Tangle
+save challenge
+click =Back
+until 60 Play: First Pops
+click =Score Chase
+until 60 Your best runs (local)
+expect No runs yet.
+save score
+click =Start run
+until 200 Move bank
+frames 150
+save score-round
+key KeyP 1
+until 60 Leave round
+frames 10
+click =Leave round
+until 120 Play: First Pops
+frames 5
+click =Achievements
+until 60 Pop your first group of cubes.
+save achievements
+click =Back
+until 60 Play: First Pops
+click =Settings
+until 60 Show text captions for sounds
+save settings
+key Tab 1
+frames 3
+key Tab 1
+frames 3
+key Tab 1
+frames 3
+key Tab 1
+frames 3
+key Tab 1
+frames 3
+key Enter 1
+until 30 Reset journey stars, achievements, and saved rounds?
+click =Cancel
+until 30 Replay tutorial
+frames 5
+key Escape 1
+until 60 Play: First Pops
+click =Help
+until 60 How to play
+expect Orbit camera
+save help
+key Escape 1
+until 60 Play: First Pops

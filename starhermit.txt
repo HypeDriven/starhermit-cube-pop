@@ -1,9 +1,25 @@
 name=Cube Pop
 description=Pop groups of matching toy cubes and combine rockets and bombs to meet each board's color goals.
-launch=index.html
 owner=2712e04e-461b-4d23-81ae-e40b429128a8
 server=score-script.js
 cover=cover.jpg
+
+# StarHermit engine script game: one package, played natively by the
+# StarHermit client and in browsers by the engine's web runtime. Browsers open
+# launch=index.html, the loader `npm run package` writes (it pins the engine
+# on wiki.starhermit.com by hash; never edit it). Re-run `npm run package`
+# after every change and commit index.html + starhermit-files.json.
+launch=index.html
+engine.api=1
+engine.entry=native/main.ts
+engine.version=1.16.2
+engine.minor=18
+engine.capabilities=platform,storage,clipboard
+
+# Keyboard controls (players rebind keys and pads in the runtime's Options).
+# The wall is also played with the pointer or touch: tap a group to pop it,
+# drag the wall to orbit the camera a little; the action tray has Hint,
+# Undo, Pause and Camera buttons.
 control.up=ArrowUp | Move selection up
 control.down=ArrowDown | Move selection down
 control.left=ArrowLeft | Move selection left
@@ -13,3 +29,17 @@ control.hint=KeyH | Hint
 control.undo=KeyU | Undo
 control.pause=KeyP+Escape | Pause / resume
 control.camera=KeyC | Reset camera
+engine.group.up=Selection
+engine.group.pop=Round
+
+# Gamepad defaults for the same actions (the browser build's pad mapping):
+# D-pad or left stick moves, A pops, B or Start pauses, X undoes, Y hints.
+engine.gamepad.up=DpadUp+LeftStickUp
+engine.gamepad.down=DpadDown+LeftStickDown
+engine.gamepad.left=DpadLeft+LeftStickLeft
+engine.gamepad.right=DpadRight+LeftStickRight
+engine.gamepad.pop=South
+engine.gamepad.hint=North
+engine.gamepad.undo=West
+engine.gamepad.pause=Start+East
+engine.gamepad.camera=RightStickPress

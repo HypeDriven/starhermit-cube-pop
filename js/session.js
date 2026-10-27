@@ -126,6 +126,10 @@
   function todayUtc() { return Content.utcDateString(now()); }
 
   // ---------- session ----------
+  // The round clock (ms): performance.now() unless a host sets Session.clock
+  // (the StarHermit engine client counts its fixed steps, so pauses, hidden
+  // windows and slow frames never cost time and play scripts replay exactly).
+  function clockNow() { return Session.clock ? Session.clock() : performance.now(); }
   function Session(cfg, opts) {
     opts = opts || {};
     this.cfg = cfg;
@@ -145,13 +149,13 @@
     this.seenIds = {};
     this.hashes = [this.initHash];
     this.undoStack = [];      // serialized prior states (rules-permitting)
-    this.startPerf = 0;       // performance.now at activation
+    this.startPerf = 0;       // clockNow() at activation
     this.lessonEvents = {};   // lesson goal counters
     this.invalidCount = 0;
   }
 
   Session.prototype.elapsed = function () {
-    return this.startPerf ? Math.max(0, performance.now() - this.startPerf) : this.state.elapsedMs;
+    return this.startPerf ? Math.max(0, clockNow() - this.startPerf) : this.state.elapsedMs;
   };
 
   Session.prototype._record = function (cmd, state) {
@@ -261,6 +265,8 @@
       initHash: this.initHash, savedAt: Date.now()
     });
   };
+  Session.clock = null;
+  Session.now = clockNow;
   Session.clearSnapshot = function () { try { localStorage.removeItem(LS.savedRound); } catch (e) {} };
   Session.prototype.clearSnapshot = Session.clearSnapshot;
 
