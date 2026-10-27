@@ -2,36 +2,33 @@
 
 **Pitch:** Tap a cluster of matching toy cubes to pop it; pop five to forge a rocket, eight to forge a bomb, and set them off in chains to fill colour quotas on a cheerful 3D toy-studio wall.
 **Genre:** Cluster-pop puzzle (single tap, gravity refill, colour quotas). **Players:** 1, with a per-device daily board. **Session:** 1–4 minutes per round; 40-stage journey, 6 challenges, 7 lessons, daily seed, endless score chase.
-**Platforms:** Desktop and mobile browsers (Chrome, Safari, Firefox), portrait and landscape, keyboard, mouse, touch and gamepad.
-**Rendering:** Three.js r160 (`vendor/three.module.min.js`, addons under `vendor/three/addons/`, both mapped by an import map) draws an instanced wall of rounded cubes in a lit toy studio; every menu, HUD element and overlay is semantic HTML. A DOM mirror grid makes the board playable without WebGL.
+**Platforms:** a StarHermit engine script game (engine 1.16.2, host API 1.18, `engine.minor=18`): played natively by the StarHermit client and in desktop and mobile browsers by the engine's web runtime; portrait and landscape, keyboard, mouse, touch and gamepad.
+**Rendering:** `starhermit:scene` (three.js-like) draws an instanced wall of rounded cubes in a lit toy studio; every menu, HUD element and dialog is `starhermit:ui` (immediate mode, styled from `assets/ui-style.json`), with an accessibility tree screen readers read (each cube is a named target).
 
 | Path | Responsibility |
 |---|---|
-| `index.html` | Single page: title, nine list/settings screens, game screen, overlays, live regions, script order |
-| `css/style.css` | Palette tokens, breakpoints (≥1024 / 600–1023 / <600 / landscape ≤500 h), safe areas, 44 px targets |
+| `starhermit.txt` | Manifest: name, owner, `server=score-script.js`, cover, `launch=index.html`, `engine.entry=native/main.ts`, engine 1.16.2 / minor 18, capabilities `platform,storage,clipboard`, `control.*` keys and `engine.gamepad.*` buttons for every action |
+| `index.html`, `starhermit-files.json` | The web loader and file index written by `npm run package` (`starhermit package --web .`; pins the engine on wiki.starhermit.com by hash — never edit them) |
+| `native/main.ts` | Entry: state machine (title → lists → countdown → active ⇄ paused → resolving → results), round lifecycle and snapshot, event presentation, lessons, input (actions, wall taps and drag orbit), the fixed-step round clock, time limits, results, lifecycle |
+| `native/screens.ts` | Every screen, the HUD, the countdown, pause and results dialogs, toasts and captions (starhermit:ui), layouts by window size |
+| `native/render.ts` | The studio on starhermit:scene: lights, room, table, shelf, cubes and charms, specials, confetti, dust motes, markers, camera fitted to the playfield, picking, the post chain per look |
+| `native/quality.ts` | The browser build's presets and budgets keyed by the runtime's quality tier and level |
+| `native/audio.ts` | Opus one-shots per event, the room-tone loop, the pentatonic music rendered into clips, captions |
+| `native/platform.ts` | The save (progress document, cloud-synced, foreign-save migration, conflict merge), the localStorage shim, the game's settings and legacy-setting migration, player, invite link, platform clock, leaderboard posting |
+| `native/classic.ts`, `native/i18n.ts`, `native/style.ts`, `native/glyphs.ts` | Loads the classic scripts below with their types; the interface language; the style sheet and high-contrast tokens; the colour icons drawn as shapes |
 | `js/rng.js` | mulberry32 PRNG, FNV-1a `hashString`, three derived streams (rules / decor / AV) |
 | `js/rules.js` | Pure deterministic rules engine: `createGame`, `applyCommand`, legality, scoring, hints, hashing, serialisation |
 | `js/content.js` | Versioned content: 6 cube colours, 5 themes, 40 journey stages, 6 challenges, 3 practice presets, score-chase ruleset, daily generator, 7 lessons, 11 achievements |
-| `js/session.js` | Round lifecycle over the engine: command ids, undo stack, replay envelope, stars, localStorage docs, server-time sync (signed in only), local daily board |
-| `js/audio.js` | WebAudio buses, authored Opus one-shots with synth fallbacks, ambience loop, seeded pentatonic music |
-| `js/render.js` | `BoardRenderer`: studio environment, instanced cubes + charms, special meshes, particles, dust motes, markers, camera, pointer input, graphics settings, post chain, adaptive resolution |
-| `js/gfx.js` | Pure graphics quality model: presets, categories, hardware level → preset, per-preset budgets, `resolve`, `presetTier`, `choosePreset`, `describe` |
-| `js/gfx-panel.js` | Settings → Graphics controls, GPU probe, panel strings in nine locales (following the game language) |
-| `js/i18n.js`, `js/locales/*.js` | `CPI18n`: `T(US-English text, vars)`, `data-i18n` markup, locale switching through `sh-language.js`; the per-language dictionaries |
-| `sh-language.js` | Shared StarHermit language-preference helper (`window.StarHermitLanguage`), an unmodified copy of `tools/sh-language.js`, loaded in `<head>` |
-| `js/ui.js` | Screens, HUD, settings, board mirror, keyboard/gamepad, rounds, pause/results, persistence glue; `CPUI.init` |
-| `js/main.js` | ES-module bootstrap: WebGL detection, renderer factory, `CPUI.init` |
-| `score-script.js` | StarHermit platform script (`server=`): range-checks a finished round's total and posts it to the `high-score` leaderboard (canonical copy in the games repo's `tools/score-script.js`) |
-| `server.js` | Local dev server: static hosting, `/api/v1/time` (read by the client only when signed in); its legacy daily board/submit routes are no longer called |
-| `data/daily-boards.json` | Legacy server-side daily entries (unused by the client; never served) |
-| `assets/` | `title-keyart.webp`, `results-banner.webp`, `table-wood.webp`, `toy-rocket.glb` |
+| `js/session.js` | Round lifecycle over the engine: command ids, undo stack, replay envelope, stars, the progress / achievement / snapshot documents in `localStorage` (the engine's shim), the device's daily board; `Session.clock` (the round clock hook) |
+| `js/i18n.js`, `js/locales/*.js` | `CPI18n`: `T(US-English text, vars)` over the per-language dictionaries |
+| `assets/` | `title-keyart.webp`, `results-banner.webp`, `table-wood.webp`, `ui-style.json` (generated from `tools/ui-style.css`) |
 | `sfx/` | 21 Opus clips, `manifest.txt` (canonical), `manifest.json` (generator input), `manifest.md` (generator output) |
-| `tests/rules.test.js` | 37 engine/content unit, property, fuzz and golden tests (`npm test`) |
-| `tests/gfx.test.js` | Graphics model tests under `node --test` (`npm test`) |
-| `tests/e2e.mjs` | Playwright playthrough of the real UI at desktop and mobile viewports (`npm run test:e2e`) |
-| `tests/browser-smoke.html` | Iframe smoke page for headless Chrome `--dump-dom` |
-| `tools/smoke-server.js`, `tools/validate-content.js` | Dev-only: API round-trip test; offline content validator |
-| `starhermit.txt`, `coverart.png`, `icon.png`, `favicon.svg`, `LICENSE.md` | Platform manifest, 1200×675 cover, 256 px icon, tab icon, PolyForm Noncommercial 1.0.0 |
+| `score-script.js` | StarHermit platform script (`server=`): range-checks a finished round's total and posts it to the `high-score` leaderboard |
+| `server.js`, `data/` | Local dev server (static files, `/api/v1/time`, legacy daily routes no client calls); left out of the package |
+| `tests/` | `rules.test.js` (37 rules/content tests), `session.test.mjs`, `i18n.test.mjs` (+ `i18n-keys.mjs`), `native.mjs` with `native/*.play` play scripts |
+| `tools/` | `gen-plays.mjs` (play scripts from the rules), `browser-play.mjs` (GPU Chrome play of the web package), `package-web.mjs`, `css.mjs` + `ui-style.css`, `validate-content.js`, `smoke-server.js` |
+| `.starhermitignore` | Leaves tests/, tools/, server.js, spec.md, coverart.png and data/ out of the package |
+| `cover.jpg`, `coverart.png`, `icon.png`, `LICENSE.md` | Platform cover, 1200×675 cover art, 256 px icon (also the web page's icon), PolyForm Noncommercial 1.0.0 |
 
 ## 1. Vision and design pillars
 
@@ -41,13 +38,13 @@ Cube Pop is the feeling of sweeping a shelf of toy blocks off a table with one f
 2. **Big groups forge tools.** Specials are never given, only earned: a 5+ group leaves a rocket on the tapped cube, an 8+ group a bomb, and blasts detonate other specials into chains (`applyCommand`, `detonate`). Rules in: hunting for size, planning where the special lands. Rules out: boosters, purchased power-ups, random specials from refills.
 3. **The wall is a toy, not a screen.** Rounded bevelled cubes with cream charms, a wooden table, a shelf of props, warm key light, plastic pops and marimba stings. Rules in: soft edges, matte plastic, wood, confetti. Rules out: neon, glass, glitch effects, abstract grids.
 4. **One engine, everywhere.** Tutorial fixtures, hints, undo and the client all run the same `CPRules` on the same seeds; every round carries a replay envelope that re-simulates to the identical final hash. Rules in: shareable seeds, replay envelopes, inspectable RNG. Rules out: hidden difficulty tuning, unverifiable scores.
-5. **Playable without the picture.** The DOM mirror grid, live regions, captions and a keyboard focus ring are first-class; the 3D view is a lens on the same state. Rules in: labels on every cell, colour + icon + charm redundancy. Rules out: canvas-only controls, hover-only information.
+5. **Playable without the picture.** Named cube targets for screen readers, announcements, captions and a keyboard focus ring are first-class; the 3D view is a lens on the same state. Rules in: labels on every cell, colour + icon + charm redundancy. Rules out: canvas-only controls, hover-only information.
 
 ## 2. Player experience
 
 **Target player:** anyone who enjoys short colour-matching puzzles; no genre literacy assumed. Rounds fit a commute stop; the journey rewards returning for 20-30 sessions.
 
-**First 60 seconds (as implemented):** the title shows the key art and a dominant `Play: First Pops` button (`refreshTitle` names the next uncompleted stage). One click starts journey stage 1 — a 6×6, 4-colour wall with two 10-cube quotas, no limits and no specials — after a 3-2-1-Pop! countdown. The stage card's `intro` text ("Tap any group of 2+ matching cubes…") is announced on activation; hovering or focusing a cell lifts and outlines its whole group, so the first legal move is visible before it is taken. Invalid taps buzz and toast the reason. Stages 3, 4, 6, 7, 9, 15 and 16 each introduce exactly one new idea in their `intro` line (rockets, move limit, bombs, chains, fifth colour, time limit, sixth colour). The **Learn** screen holds seven fixture-grid lessons that each require the player to perform the rule (`Content.tutorialLessons`, `Session.lessonGoalMet`).
+**First 60 seconds (as implemented):** the title shows the key art and a dominant `Play: First Pops` button (the title names the next uncompleted stage). One click starts journey stage 1 — a 6×6, 4-colour wall with two 10-cube quotas, no limits and no specials — after a 3-2-1-Pop! countdown. The stage card's `intro` text ("Tap any group of 2+ matching cubes…") is announced on activation; hovering or focusing a cell lifts and outlines its whole group, so the first legal move is visible before it is taken. Invalid taps buzz and toast the reason. Stages 3, 4, 6, 7, 9, 15 and 16 each introduce exactly one new idea in their `intro` line (rockets, move limit, bombs, chains, fifth colour, time limit, sixth colour). The **Learn** screen holds seven fixture-grid lessons that each require the player to perform the rule (`Content.tutorialLessons`, `Session.lessonGoalMet`).
 
 **Session shape:** pick a card → countdown → 8-25 taps → results card with a score breakdown, stars and a Next button → next stage or menu. Pausing saves the round; the title shows `Resume saved round` on return.
 
@@ -90,106 +87,98 @@ Cube Pop is the feeling of sweeping a shelf of toy blocks off a table with one f
 
 ### RNG and seeding
 - Master seed → `RNG.derive(seed, STREAM_RULES)` for the board and refills; `STREAM_DECOR` for the title mosaic; `STREAM_AV` is reserved for audio variants. Same config + same command log ⇒ identical `hashState` (property-tested).
-- Journey seeds are fixed (201-240), challenges 501-506, lessons 9001-9007, practice presets use the seed the config carries (none: `seed >>> 0 = 0`), daily = FNV-1a of `cubepop-daily-v1-YYYY-MM-DD`, score chase = `Math.random()` per run.
+- Journey seeds are fixed (201-240), challenges 501-506, lessons 9001-9007, practice presets use the seed the config carries (none: `seed >>> 0 = 0`), daily = FNV-1a of `cubepop-daily-v1-YYYY-MM-DD`, score chase = FNV-1a of the platform clock per run.
 
 ### Undo and hints
 - Undo (`Session.undo`) pops a 30-deep stack of serialised prior states, removes the last `pop` from the replay log, and is allowed only when `cfg.mechanics.undo` is true. It is a real command-log edit, so the envelope stays replayable.
 - Hint (`Rules.hint`) uses `legalActions` and returns the first of: a bomb-forging group, a rocket-forging group, a special whose blast touches another special, the largest group of a still-needed colour, the largest group, any special. The UI moves focus there, outlines it in gold and explains `why`.
 
-## 4. Modes and progression (`js/content.js`, `js/ui.js`)
+## 4. Modes and progression (`js/content.js`, `native/main.ts`)
 
 | Mode | Screen | Content | Assists | Persists |
 |---|---|---|---|---|
-| Journey | `#screen-journey` | 40 authored stages `j01-j40`; stage N+1 unlocks when N is completed; mastery stages at 10, 20, 30, 40 | undo + hint | `progress.completed`, `progress.stars` |
-| Daily Challenge | `#screen-daily` | One immutable config per UTC day from `dailyConfig(date)`; shows seed, size, colours, limits, countdown to next day, today's board on this device | undo + hint | `dailyBest[date]`, `progress.dailiesDone`, `daily-boards` entry |
-| Practice | `#screen-practice` | Casual 6×6/4 colours/no limit; Apprentice 7×7/5/20 moves; Expert 8×8/6/20 moves | undo + hint | nothing ranked |
-| Challenge | `#screen-challenge` | `c1-c6`: 3-colour 14-move; 90 s speed; 9 moves no assists; bombs at 7; rockets at 4 no bombs; move + time limit no assists | per card | `progress.stars` |
-| Score Chase | `#screen-score` | Endless Wall: 8×8, 5 colours, bank of 20 moves +12 per wave, quotas grow `4 + 2×wave` over `min(5, 2 + ⌊wave/3⌋)` colours | none | local top-10 runs |
-| Learn | `#screen-learn` | 7 lessons on 5×5 fixture grids: pop, forge rocket, fire rocket, chain, forge bomb, finish stage, undo | per lesson | `progress.completed[t1..t7]` |
+| Journey | Journey | 40 authored stages `j01-j40`; stage N+1 unlocks when N is completed; mastery stages at 10, 20, 30, 40 | undo + hint | `progress.completed`, `progress.stars` |
+| Daily Challenge | Daily Challenge | One immutable config per UTC day from `dailyConfig(date)`; shows seed, size, colours, limits, countdown to next day, today's board on this device | undo + hint | `dailyBest[date]`, `progress.dailiesDone`, `daily-boards` entry |
+| Practice | Practice | Casual 6×6/4 colours/no limit; Apprentice 7×7/5/20 moves; Expert 8×8/6/20 moves | undo + hint | nothing ranked |
+| Challenge | Challenge | `c1-c6`: 3-colour 14-move; 90 s speed; 9 moves no assists; bombs at 7; rockets at 4 no bombs; move + time limit no assists | per card | `progress.stars` |
+| Score Chase | Score Chase | Endless Wall: 8×8, 5 colours, bank of 20 moves +12 per wave, quotas grow `4 + 2×wave` over `min(5, 2 + ⌊wave/3⌋)` colours | none | local top-10 runs |
+| Learn | Learn | 7 lessons on 5×5 fixture grids: pop, forge rocket, fire rocket, chain, forge bomb, finish stage, undo | per lesson | `progress.completed[t1..t7]` |
 
 **Difficulty curve (journey):** 6×6 with 4 colours (j01-j09) → 7×7 with 5-6 colours (j10-j20) → 8×8 with 6 colours (j21-j40). Rockets enter at j03, move limits at j04, bombs at j06, time limits at j15/j23/j28/j33/j38. Quotas rise from 10+10 to 24×4; move limits sit 2-6 above `par.moves`.
 
 **Daily rotation** (`rot = dayNumber mod 7`): colours `4 + rot mod 3`, `2 + rot mod 2` quotas of `12 + 2·rot`, 8×8 when `rot ≥ 4`, rockets at 4 on `rot 5`, bombs at 7 on `rot 3`, `16 + rot` moves, 150 s limit on `rot 6`, theme `THEMES[rot mod 5]`.
 
-**Unlocks:** themes by total stars — Sunny Studio 0, Mint Workshop 12, Twilight Loft 30, Candy Corner 55, Ivory Attic 85. Achievements (11, `Content.ACHIEVEMENTS`) unlock idempotently in localStorage and toast on first unlock.
+**Unlocks:** themes by total stars — Sunny Studio 0, Mint Workshop 12, Twilight Loft 30, Candy Corner 55, Ivory Attic 85. Achievements (11, `Content.ACHIEVEMENTS`) unlock idempotently in device storage and toast on first unlock.
 
 ## 5. Controls and interaction
 
-| Action | Keyboard | Pointer / touch | Gamepad |
+Actions are declared in `starhermit.txt`; players rebind keys and pad buttons in the runtime's Options (Settings › Change keys and buttons opens it). Help's controls table shows the current bindings.
+
+| Action (`control.*`) | Keyboard | Pointer / touch | Gamepad |
 |---|---|---|---|
-| Move focus | Arrow keys | hover (mouse) previews the group | D-pad / left stick |
-| Pop / fire | Enter, Space | tap a cube (< 600 ms, < 12 px travel) | A (0) |
-| Hint | H | Hint button | Y (3) |
-| Undo | U | Undo button | X (2) |
-| Pause | P, Escape | Pause button; tab hidden auto-pauses | B (1), Start (9) |
-| Resume | Escape (while paused) | Resume button | — |
-| Orbit camera | — | drag on the board (yaw ±0.35 rad, pitch −0.15..0.3) | — |
-| Reset camera | C | Camera button | — |
+| `up` / `down` / `left` / `right` — move focus | Arrow keys | the mouse's hover previews the group under it | D-pad / left stick |
+| `pop` — pop / fire | Enter, Space | tap a cube (< 600 ms, < 12 px travel) | A (South) |
+| `hint` | H | Hint button | Y (North) |
+| `undo` | U | Undo button | X (West) |
+| `pause` — pause / back | P, Escape | Pause button; a hidden window auto-pauses | Start, B (East) |
+| orbit camera | — | drag on the wall (yaw ±0.35 rad, pitch −0.15..0.3) | — |
+| `camera` — reset camera | C | Camera button | right stick press |
 
-- Pointer picking raycasts an invisible plane at the cube face depth; cubes and particles never intercept rays (`render.js` `_initInput`). Pointer capture is taken on down and released on up/cancel.
-- **Input locking:** `tryPop` accepts input only in state `active`; a successful pop sets `resolving` and `inputLocked` until the renderer's event timeline lands (`playEvents` returns its duration; reduced motion returns 0). Pausing mid-resolution defers completion (`pendingResolution`) until resume.
-- **Feedback for every input:** focus ring + `cube-select` tick on arrows; group outline and 0.12 lift on hover/focus (red outline when illegal); toast + assertive announcement + `invalid-buzz` on rejection; pops, forges, fires, chains, shuffles, goal fills, waves and results each have a sound, a caption and a live-region sentence.
-- Command ids `c<seq>-<time36>` make double commits idempotent; there is no debounce timer.
+- Menus and dialogs take Tab / arrows / Enter / Escape and the pad's D-pad / South / East (starhermit:ui); Escape on a list screen goes back to the title, in the pause dialog it resumes. F1 opens the runtime's Options.
+- **Picking:** a press inside the playfield (the window rectangle the HUD leaves) is the wall's: `render.pick` casts from the camera onto the cubes' front plane. Presses are queued and decided after the frame's UI is built. A drag beyond 12 px orbits instead of popping.
+- **Input locking:** `tryPop` acts only in phase `active`; a successful pop sets `resolving` until the wall's event timeline lands (`render.playEvents` returns its length; reduced motion returns 0). Pausing mid-resolution holds the timeline; it finishes after Resume.
+- **Feedback for every input:** focus ring + `cube-select` tick on arrows; group outline and 0.12 lift on hover/focus (red outline when illegal); toast + assertive announcement + `invalid-buzz` on rejection; pops, forges, fires, chains, shuffles, goal fills, waves and results each have a sound, a caption and an announcement.
+- Command ids `c<seq>-<step36>` make double commits idempotent.
 
-## 6. Screens and UI flow (`ui.js` `setState`, `showScreen`)
+## 6. Screens and UI flow (`native/main.ts` `app.phase`, `show`; `native/screens.ts`)
 
-`boot → title → (journey | daily | practice | challenge | score | learn | achievements | settings | help) → preparing → countdown → active ⇄ paused → resolving → results → (title | next round)`. `document.body.dataset.gameState` mirrors the state for styling and tests. Each screen is a `<section class="screen" data-screen>`; `showScreen` hides the others and focuses the first heading or button.
+`title → (journey | daily | practice | challenge | score | learn | achievements | settings | help) → preparing → countdown → active ⇄ paused → resolving → results → (title | next round)`. The top bar (title, the platform's UTC clock, the account / sync line) shows on every screen.
 
-- **Title:** key art hero (`assets/title-keyart.webp` over a procedural cube mosaic canvas), `Play: <next stage>`, conditional `Resume saved round`, 9-button mode grid, progress line (journey count, stars, achievements).
-- **List screens:** `levelCard` buttons with name, meta (`moves · seconds · size · colours`), stars, lock note, intro; Back button last.
-- **Game:** three-column grid ≥ 1024 px (goal rail 180-240 px · playfield · status rail 150-200 px, action tray below). 600-1023 px stacks goals / playfield / stats / tray. < 600 px tightens gaps and wraps the stats. Landscape ≤ 500 px tall: goal rail left, playfield right, stats float top-right, tray under the playfield. Safe-area insets pad the top bar, screens, tray, toast and overlays; `body.left-handed` reverses the tray.
-- **Large screens:** `ui-scale.js` sets `--ui-scale` on `<html>` (1 up to a 1600×1000 viewport, then the smaller of width/1600 and height/1000, capped at 2.5; 2560×1440 → 1.44, 3840×2160 → 2.16). `#topbar`, `#main` (every screen, the game grid, overlays, toast), captions and the FPS meter are CSS-`zoom`ed by it with vw/vh lengths divided by it, and the title block is centred vertically; the studio canvas and title mosaic multiply their pixel ratio by it so they stay sharp.
-- **Overlays:** countdown (`3 2 1 Pop!`, skipped under reduced motion), pause dialog (Resume, Settings, Help, Restart, Leave), results dialog (banner on wins, headline, breakdown table, stars, daily submit box, Retry / Next / Menu, replay envelope `<details>`), WebGL-fail card (continue with the visible grid).
-- **Never cut off:** the action tray (bottom safe area), the goal rail, HUD score/moves/time, overlay buttons (`overlay-card` scrolls at `max-height: 90vh`), toasts (`max-width: 80vw`).
-- **Toasts and captions:** click-through (`pointer-events: none`; only a selectable invite link inside a toast takes the pointer) and, during a round, placed just above the action tray (`ui.js:trayClearance`), so they never hide or swallow a press on Hint/Undo/Pause/Camera.
+- **Title:** key art hero (`assets/title-keyart.webp`, over the procedural cube mosaic until it loads), `Play: <next stage>`, conditional `Resume saved round`, 9-button mode grid (3 columns, 2 on phones), Sign in with StarHermit (signed out) / Invite a friend (signed in), progress line (journey count, stars, achievements). Below 600 px the hero stacks above the menu.
+- **List screens:** level cards in a grid (auto-fill, ≥ 220 px) with name, meta (`moves · seconds · size · colours`), stars, lock note, intro; mastery stages have a gold border; Back last. Pages scroll when taller than the window and open at their top.
+- **Game:** ≥ 1024 px wide: goal rail (240 px) · playfield · status rail (200 px), action tray below. Narrower: the goals (wrapping) and lesson box above the wall, the stats row and tray under it. Short landscape (≤ 500 px tall): a narrow goal rail left, the stats floating over the wall's top-right corner, the tray under the wall. Safe areas are honoured; Left-handed reverses the tray. On High and Ultra the view's corners are rounded.
+- **Dialogs:** countdown (`3 2 1 Pop!` over a dim, skipped under reduced motion), pause (Resume, Settings, Help, Restart round, Leave round; Settings and Help return to it), results (banner on wins, headline, breakdown, stars, the leaderboard line when signed in, the daily name field and Save to today's board, Retry / Next / Menu / Copy replay envelope). Dialogs scroll their body with the buttons pinned below.
+- **Toasts and captions** sit just above whatever is under the wall (tray or stats), never over the buttons, and take no presses.
 
 ## 7. Art direction
-
-**Palette (CSS tokens, `css/style.css`):** background `#f6e3c8`, panel `#fff8ee`, ink `#3d2f23`, soft ink `#6d5b48`, accent `#e4574f`, accent-2 `#f2c14e`, focus `#2e6fe4`, danger `#b3352e`. High-contrast mode swaps to `#ffffff / #000000 / #b3001b / #0033cc`.
-**Cube colours** (`Content.COLORS`, high-contrast variant in brackets): Cherry `#e4574f` (`#d62828`), Lemon `#f2c14e` (`#f5d90a`), Leaf `#5da85f` (`#17a398`), Sky `#5b8fd4` (`#2e6fe4`), Grape `#9a6fc8` (`#8e24aa`), Tangerine `#ef8b4a` (`#ef6c00`). Charms are cream `#fff6e8`: sphere, star, cone, octahedron, torus, icosahedron.
+**Palette (style tokens, `tools/ui-style.css` → `assets/ui-style.json`):** background `#f6e3c8`, panel `#fff8ee`, ink `#3d2f23`, soft ink `#6d5b48`, accent `#e4574f`, accent-2 `#f2c14e`, focus `#2e6fe4`, danger `#b3352e`. The runtime's high contrast swaps to `#ffffff / #000000 / #b3001b / #0033cc` (`native/style.ts`) and the cubes to their high-contrast colours.
+**Cube colours** (`Content.COLORS`, high-contrast variant in brackets): Cherry `#e4574f` (`#d62828`), Lemon `#f2c14e` (`#f5d90a`), Leaf `#5da85f` (`#17a398`), Sky `#5b8fd4` (`#2e6fe4`), Grape `#9a6fc8` (`#8e24aa`), Tangerine `#ef8b4a` (`#ef6c00`). Charms are cream `#fff6e8`: sphere, star, cone, octahedron, torus, icosahedron. In the UI the colour icons (♥ ★ ▲ ◆ ☾ ✿) are drawn as shapes (`native/glyphs.ts`).
 **Themes** (`Content.THEMES`, wall / table / accent): Sunny Studio `#f6e3c8 / #c98d5f / #ff9d5c`; Mint Workshop `#d8efe0 / #7fae8e / #6fce9a`; Twilight Loft `#2c3350 / #4a4f78 / #8fa8ff`; Candy Corner `#fbe0ea / #d887ac / #ff8fb8`; Ivory Attic `#f2eee6 / #b8a88e / #e8c07a`. Each also sets floor, frame, key-light and fog colours.
 
 **Shape language:** rounded-square extrusions with bevels (`roundedCubeGeo`: 10 % bevel plus 10 % corner radius, inset so the finished cube measures exactly its edge and neighbours leave a visible gap), specials as a cube with a cone-and-fin rocket or a sphere-and-fuse bomb on top, chunky shelf props (spheres and cones). UI uses 12 px radii, 2 px translucent borders and pill toasts.
-**Typography:** system UI stack, 16 px base (20 px with Larger text), tabular numerals for score, moves, time and quotas; 70 ch maximum line length on menu screens.
-**Lighting:** ACES tone mapping at exposure 1.05 with sRGB output, warm directional key (theme `light`) with PCF soft shadows whose orthographic frustum is fitted to the wall, table top and the strip of back wall behind it (`_fitShadow`), hemisphere fill, low ambient, a cool rim light at Detailed, fog at 18-40 units. The hero of the screen is the cube wall: the camera (38° fov) frames it to fill the playfield; environment stays desaturated and behind.
-**Motion:** pop 160 ms shrink with 10-particle bursts, fall 220 ms smoothstep, blasts 260 ms staggered 90 ms per chain step with camera shake ≤ 0.3, refill drops from above (340 ms), shuffle 450 ms, win/wave confetti ring. Graphics presets cap DPR (Low 1, Balanced 1.5, High/Ultra 2), shadows and particles (see Graphics). **Reduced motion:** no countdown, no tweens (state snaps via `syncToState`), no shake, no hover lift, no button transitions.
+**Typography:** the runtime's UI face, 16 px base (the runtime's text size scales it), tabular numerals for score, moves, time and quotas; ~640 px maximum line length on menu screens.
+**Lighting:** ACES tone mapping at exposure 1.05, a warm directional key (theme `light`, 2.2/π) with soft shadows reaching over the wall, table and back wall, hemisphere fill, low ambient, a cool rim light on detailed looks, fog at 18-40 units (three.js intensities ÷ π, the engine's convention). The camera (38° fov) frames the wall to fill the playfield (`setViewOffset` places it between the HUD's rails); environment stays desaturated and behind.
+**Motion:** pop 160 ms shrink with 10-particle bursts, fall 220 ms smoothstep, blasts 260 ms staggered 90 ms per chain step with camera shake ≤ 0.3, refill drops from above (340 ms), shuffle 450 ms, win/wave confetti ring, all on the runtime's fixed steps. **Reduced motion** (the runtime's option): no countdown, no tweens (state snaps), no shake, no hover lift, no ambient motion.
 
-**Graphics.** At Detailed the cubes are soft-touch toy plastic (`MeshPhysicalMaterial` on High/Ultra, roughness 0.5, a thin 0.4 clearcoat), specials get a glossy clearcoat and the bomb fuse carries an over-bright spark; the studio gains a procedural striped wallpaper, floorboards, a skirting board and extra shelf toys (a stack of blocks, a ring). Reflections light PBR materials from a `RoomEnvironment` PMREM as `scene.environment` at low `envMapIntensity` (0.2–0.4) so colours stay saturated. The optional post chain (EffectComposer: RenderPass → GTAO contact shadows → UnrealBloom at threshold 0.9 that catches only the fuse spark and particle sparkles → a colour grade with a gentle S-curve, +10 % saturation, warm highlights and a soft vignette → OutputPass → SMAA or FXAA; MSAA uses a 4-sample target) runs only when an effect needs it. High particles are larger soft round confetti with every fifth one an over-bright sparkle; animated background adds drifting dust motes in the key light, a slow key-light shimmer, an idle bob on specials and a flickering fuse, all frozen by the reduced-motion setting or `prefers-reduced-motion`. Settings → **Graphics** offers Quality (Auto, chosen from the StarHermit hardware level, below; Low; Balanced; High; Ultra), a render scale slider (50–200 % of the preset's scale), one select per category defaulting to "From preset (…)" — shadows off/low/medium/high (1024²/2048²/4096²), ambient occlusion off/on/high, bloom, colour grade, anti-aliasing off/FXAA/SMAA/MSAA, reflections, particles low/high, ambient motion still/animated, studio detail plain/detailed — adaptive resolution (averages 90 frames; above 26 ms steps the scale down 0.1 to 0.6, below 14 ms back up 0.05 to 1) and a frame-rate readout (bottom-left, `#fps-meter`), plus a summary line "GPU · Level N · effects · W×H px" ("Level" localized) and a note when post-processing cannot be built (the studio then renders without it). Choosing a preset clears overrides; changes apply live and persist in `cubepop:settings:v1` as `graphics` (the older single `quality` tier migrates to the matching preset). The resolved preset is mirrored as `data-gfx-preset` on `<body>` and the studio canvas. Pixel ratio = min(DPR, preset cap) × preset scale × render scale × adaptive scale; Low renders straight to the canvas with no composer, no shadows, plain materials and 30-particle bursts. Presets:
+**Graphics.** The runtime's Options choose the graphics level (Auto from the device, or one of ten levels in four tiers), render scale, adaptive resolution and the frame-rate limit; the game reads `frame().quality` (the tier) and `frame().levelIndex` and applies the browser build's preset for that tier (`native/quality.ts`): at Detailed the cubes are soft-touch toy plastic (`MeshPhysicalMaterial` on High/Ultra, roughness 0.5, a thin 0.4 clearcoat), specials get a glossy clearcoat and the bomb fuse carries an over-bright spark; the studio gains a procedural striped wallpaper, floorboards, a skirting board and extra shelf toys (a stack of blocks, a ring). Reflections light PBR materials from `new RoomEnvironment(renderer)` through `PMREMGenerator.fromScene` as `scene.environment` at the old per-material `envMapIntensity` (0.2–0.4). The post chain is the renderer's: `renderer.ao` (GTAO, radius 0.45), `renderer.bloom` (strength 0.45, radius 0.4, threshold 0.9: only the fuse spark and sparkles bloom), `renderer.grade` (display space: a gentle S-curve, +10 % saturation, warm highlights / cool shadows, a 0.2 vignette) and `renderer.antialias`. High particles are larger soft round confetti with every fifth one an over-bright sparkle; animated looks add drifting dust motes in the key light, a slow key-light shimmer, an idle bob on specials and a flickering fuse. The shadow map size and MSAA samples are the level's. Changing level rebuilds the studio and cube meshes when the asset variants differ; gameplay is identical on every level.
 
-| Preset | Scale | Shadows | AO | Bloom | Grade | AA | Reflections | Particles | Background | Detail |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Low | 1 | off | off | off | off | MSAA (canvas) | off | low | static | plain |
-| Balanced | 0.9 | low | off | on | on | FXAA | on | high | animated | detailed |
-| High | 1 | medium | on | on | on | SMAA | on | high | animated | detailed |
-| Ultra | 1.25 | high | high | on | on | MSAA | on | high | animated | detailed |
-
-**Hardware-level detection.** `gpu-level.js` (shared StarHermit copy, `window.StarHermitGpu`, loaded before `js/gfx.js`) rates the WebGL unmasked renderer on the StarHermit hardware level 0–20 (0 = Galaxy S20 / Intel UHD or weaker and every software renderer, 20 = RTX 5090, each level ≈ 1.23×; laptop parts two levels below desktop; phones, tablets and ≤ 4 GB machines capped at 9). `js/gfx.js` maps it with `presetForLevel(level, { low: 0, balanced: 4, high: 10, ultra: 17 })`, so Auto picks Ultra on strong GPUs; adaptive resolution still steps down when slow. Headless SwiftShader is level 0 → Low. Phones and tablets pace Auto FPS at half the display refresh rate ("Auto (half refresh rate)") and start at 16 simultaneous sounds (shared `game-options.js`).
-
-**Per-preset budgets** (`BUDGETS` / `budgetFor` in `js/gfx.js`; each preset holds 60 FPS on the weakest GPU Auto gives it — Low at level 0, Balanced 4, High 10, Ultra 17). Counts are tuned at the floor level and scale up within the preset on faster GPUs (`StarHermitGpu.scaleBudget`, ≤ 4×). Changing preset rebuilds the studio and cube meshes when the asset variants differ; gameplay is identical on every preset.
+| Tier | Shadows | AO | Bloom | Grade | AA | Reflections | Particles | Background | Detail |
+|---|---|---|---|---|---|---|---|---|---|
+| Low | off | off | off | off | MSAA | off | low | static | plain |
+| Balanced | 1024 | off | on | on | FXAA | on | high | animated | detailed |
+| High | 2048 | on | on | on | SMAA | on | high | animated | detailed |
+| Ultra | 4096 | high | on | on | MSAA | on | high | animated | detailed |
 
 | Budget | Low | Balanced | High | Ultra |
 |---|---|---|---|---|
 | Materials (room, table, cubes, charms, specials, toys) | Lambert | Standard | Physical (clearcoat when detailed) | Physical |
 | Cube corner curve / bevel segments | 3 / 1 | 5 / 2 | 8 / 4 | 12 / 5 |
 | Wallpaper / floorboard texture (Detailed) | — | 256 px | 256 px | 512 px |
-| Dust motes (Scenery motion) | 24 | 40 | 70 | 120 |
+| Dust motes (animated) | 24 | 40 | 70 | 120 |
 | Particles per burst (Particles high; low tier 30) | 30 | 100 | 160 | 240 |
 | Bloom / GTAO resolution | ½ / ½ | ½ / ½ | ½ / ½ | full / full |
-| Rounded corners on the 3D view (a clip mask re-composited every frame) | off | off | on | on |
+| Rounded corners on the 3D view | off | off | on | on |
 
-**60 FPS benchmark** (`node tools/gfx-bench.mjs cube-pop [--mobile --presets low,balanced]`, dev-only, real GPUs; hook `tests/gfx-bench.mjs` picks the preset in Settings → Graphics, starts the next Journey stage and keeps popping the largest group through the board's accessible cell buttons, returning to the menu and playing again after each result). Measured 2026-10-17 (AMD Radeon iGPU level 2 GPU time minus the same page recorded with draws skipped, projected to the preset's floor level; RTX 5090 CPU time):
+Motes and bursts grow with the level above the tier's first (≈ 1.64× a level, at most 4×), as the browser build scaled them by its hardware level.
 
-- Desktop 1920×1080: PASS low (typical 0.84, slow 3.19 ms at level 0; CPU p90 0.80 ms); PASS balanced (typical 2.49, slow 3.41 at level 4; CPU 1.30 ms); PASS high (typical 2.02, slow 2.96 at level 10; CPU 1.20 ms); PASS ultra (typical 3.25, slow 3.47 at level 17; CPU 1.20 ms).
-- Mobile 390×844 @3×: PASS low (typical 0.00, slow 0.12 at level 0; CPU 0.60 ms); PASS balanced (typical 0.00, slow 0.00 at level 4; CPU 0.90 ms).
+**Visual assets the design calls for:** title key art (studio wall at rest), results celebration banner (rocket launch over cubes), a wood-grain table texture, cover art and icon. All exist; see §15.
 
-**Visual assets the design calls for:** title key art (studio wall at rest), results celebration banner (rocket launch over cubes), a wood-grain table texture, a hero toy-rocket model, cover art and icon. All exist; see §15.
-
-## 8. Audio direction (`js/audio.js`)
+## 8. Audio direction (`native/audio.ts`)
 
 **Philosophy:** toy-box foley. Every sound is a small physical object — plastic cubes, wooden blocks, marimba bars, a tin whistle. Nothing is louder than the bomb. Sounds are tiered: input acknowledgement (click, select) < move (pop, undo) < reward (forge, fire, chain, goal fill, wave) < round end (win, lose, achievement).
-**Buses:** `master ← music | effects | ambience`, each with a settings slider (defaults 0.5 / 0.8 / 0.4) and a global mute. The context is created on the first user gesture (`Audio.unlock`), suspended on pause and hidden tabs.
-**Music:** a seeded pentatonic loop synthesised in `startMusic` (five scales, one per theme, 420 ms step). **Ambience:** `studio-ambience.opus` loops on the ambience bus once decoded; a two-oscillator hum plays until then or if the clip fails.
-**Samples:** each event prefers its Opus clip (lazy-fetched after unlock and cached) and falls back to the synthesised transient in the same function, so the cue always fires. All event sounds also emit a caption when captions are on.
+**Buses:** the runtime's — music, effects (every game sound and the room tone) and interface (the menu click); Options › Audio owns their volumes, the mute and the voice limit. The browser build's default levels (music 0.5, effects 0.8, ambience 0.4) are folded into each sound's gain. Pause and a hidden window hold the music, the room tone and new sounds.
+**Music:** the browser build's seeded pentatonic loop (five scales, one per theme, a sine note every 420 ms walking the scale, a bass note an octave down every fourth step), each note rendered once into a clip with the old envelope. **Ambience:** `studio-ambience.opus` loops under a round.
+**Samples:** each event plays its Opus clip; clips load one at a time once the mixer runs (in a browser after the first press), so a cue whose clip is still loading is silent (the browser build's synthesised stand-ins are not ported). Every event sound also emits a caption when Sound captions is on.
 
 | Event id | File | Description | Usage context |
 |---|---|---|---|
@@ -213,110 +202,95 @@ Cube Pop is the feeling of sweeping a shelf of toy blocks off a table with one f
 | `countdownGo` | `countdown-go.opus` | whistle pip + pop | "Pop!" |
 | `goalFill` | `goal-fill.opus` | two-note marimba + wooden knock | a colour quota reached mid-round |
 | `timeWarning` | `time-warning.opus` | kitchen-timer double tick | clock first under 15 s |
-| `ambience` | `studio-ambience.opus` | cosy workshop room tone, 12 s loop | whole round, ambience bus |
+| `ambience` | `studio-ambience.opus` | cosy workshop room tone, 12 s loop | whole round, effects bus |
 
 `sfx/manifest.txt` is generated from this table and is the binding source of truth.
 
 ## 9. Localization
 
-Nine locales ship: **en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, it-IT**, for every player-facing string — screens, settings, help, HUD, goals and colour names, announcements and captions, toasts, results, stage/challenge/lesson/achievement/theme names and intros, and the StarHermit strings. "Cube Pop" stays untranslated.
+Nine locales ship: **en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, it-IT**, for every player-facing string — screens, settings, help, HUD, goals and colour names, announcements and captions, toasts, results, stage/challenge/lesson/achievement/theme names and intros, and the StarHermit lines. "Cube Pop" stays untranslated.
 
-- **Strings.** Code calls `T('US-English text', { vars })` (`js/i18n.js`, global `CPI18n`); `js/locales/*.js` map that text per language (en-GB lists only the colour spellings; es-ES and fr-CA only their differences from es-419 and fr-FR). Static markup carries `data-i18n` / `data-i18n-aria` / `data-i18n-title`; content tables keep English source text and are translated at display time.
-- **Settings → Graphics → Language** (rendered by `game-options.js` from the `sh-language.js` instance) offers **Automatic — <resolved language>** plus the nine locales by native name, with a status line (Saved to account / Saved on this device / Account sync unavailable). It is reachable from the title (Settings) and mid-round (Pause → Settings).
-- **Resolution** (`sh-language.js`): explicit game choice → for Automatic, the StarHermit account's `preferredLanguage` (`GET /api/v1/me/language`, signed in only) → `navigator.languages` → en-US; tags map to the nearest shipped locale. The choice (`auto` or a locale) is stored per player in `localStorage['cube-pop.language.<user|guest>']` and, signed in, in the per-player settings key `ui.language` as `{ choice }`; a failed settings read never overwrites it, and the game never writes the platform preference. `?lang=` forces a locale for one page load (QA links) and hides the selector. Standalone play makes no language request.
-- **Live switching.** A change sets `<html lang>`, re-applies the markup and re-renders the title (Play label, progress line), the open list screen, Help, the settings screen (theme list and the game's own Graphics controls; the shared Language / Sound / Report sections stay), the HUD and goal rail, the lesson box, and an open results card — the round, its clock and the board are untouched.
-- **Expansion.** Cards and the tray wrap, overlay cards scroll, title buttons wrap long words; German was checked at 390 px wide with nothing cut off.
+- **Strings.** Code calls `T('US-English text', { vars })` (`native/i18n.ts` over `js/i18n.js`'s `CPI18n`); `js/locales/*.js` map that text per language (en-GB lists only the colour spellings; es-ES and fr-CA only their differences from es-419 and fr-FR). Content tables keep English source text and are translated at display time.
+- **Language** is the runtime's interface language (`preferences().language`: the player's choice in Options › Language, else the account's preferred language or the device's), mapped to the nearest shipped locale; a change re-renders everything on the next frame (the UI is rebuilt every frame) and leaves the round untouched. The browser build's own Language selector and its `ui.language` account key are gone (the key is removed on first run).
+- **Expansion.** Cards, the tray, button rows and goals wrap; long labels wrap inside their buttons; pages and dialogs scroll.
 
 ## 10. Accessibility
 
-- **Keyboard-only path:** skip link → title buttons → any screen → game: arrows move the focus ring on the 3D wall and the mirror grid in lock-step, Enter pops, H/U/P/C act, overlays trap focus on their first button and restore `lastFocusEl` on resume. No hover-only information: focus previews the same outline hover does.
-- **Screen reader:** `#board-mirror` is a table of buttons labelled `Row r column c: Colour, group of n | row rocket | column rocket | bomb | empty`; `#live-status` (polite) announces stage intro, legal-move summary, every pop with score, hints, waves, shuffles, pauses and results; `#live-alert` (assertive) carries rejections and context loss. Goal rail rows read `Colour have / need`.
+- **Keyboard and pad path:** every screen, list and dialog works with Tab / arrows / Enter / Escape (and D-pad / South / East); in a round the arrows move the focus ring on the wall, Enter pops, H/U/P/C act; dialogs focus their first button.
+- **Screen reader:** starhermit:ui builds the accessibility tree; each cube is a named target `Row r column c: Colour, group of n | row rocket | column rocket | bomb | empty` (`ui.target`), and announcements (`ui.announce`) carry the stage intro, the legal-move summary, focus moves, every pop with score, hints, waves, shuffles, pauses, achievements and results (rejections assertively). Goal rows read `Colour have / need`.
 - **Colour independence:** each colour has an icon, a label and a 3D charm shape; goal swatches carry the icon; hint outline is gold, invalid outline red, both with text.
-- **Settings:** reduced motion (also honours `prefers-reduced-motion` for CSS), high-contrast cube palette and UI tokens, larger text, left-handed tray, captions for sounds, Graphics (quality preset, render scale, per-effect overrides, adaptive resolution, frame rate), theme, replay tutorial, reset progress.
-- **Targets and contrast:** buttons ≥ 44 × 44 px with 8 px gaps; ink `#3d2f23` on `#fff8ee` ≈ 10.9:1; focus outline 3 px `#2e6fe4`.
-- **Grid mode:** when WebGL is missing or the context is lost, the mirror grid becomes visible and remains fully playable with the same commands.
+- **Options:** the runtime's reduced motion, high contrast (UI tokens and the high-contrast cube palette), text size and interface size, plus the game's Sound captions and Left-handed action tray; theme, replay tutorial, reset progress.
+- **Targets and contrast:** buttons ≥ 44 × 44 px with 8 px gaps; ink `#3d2f23` on `#fff8ee` ≈ 10.9:1; focus ring 3 px `#2e6fe4`.
 
 ## 11. StarHermit integration
 
-Manifest `starhermit.txt`: `name=Cube Pop`, `launch=index.html`, `owner=<uuid>`, `server=score-script.js`, `cover` (conventions per https://wiki.starhermit.com/), plus one `control.<action>=<Code>[+<Code>] | <Label>` line per keyboard action: `up`/`down`/`left`/`right` = arrows, `pop` = Enter+Space, `hint` = KeyH, `undo` = KeyU, `pause` = KeyP+Escape, `camera` = KeyC.
+Everything goes through the runtime's modules (`starhermit:platform`, `starhermit:storage`); signed out (a guest) the game makes no platform calls and plays fully offline.
 
-All platform I/O goes through `starhermit-sdk.js` (an unmodified copy of `tools/starhermit-sdk.js`, loaded before `js/platform.js`); `js/platform.js` (`CPPlatform`) is a thin adapter over `window.StarHermit` that keeps the game's API.
-
-**Used:**
-- **Game script** (`server.js`): the client reads same-origin `GET /api/v1/time` **only when signed in** (server clock; round-trip-adjusted offset in `Session.syncTime`, UTC shown in the top bar). Standalone (no launch token) the game makes no own-server requests at all and uses the local clock. The legacy `/api/v1/daily/*` routes in `server.js` are not called.
-- **Daily board:** local to the device (`cubepop:daily-boards:v1`, last 14 days, top 50 per day, one entry per name keeping the better run). Signed out: casual name entry (`Guest` default). Signed in: entries use the account nickname (the name field is read-only).
-- **Sessions:** solo and local; the daily is an asynchronous seeded session with a replay envelope (`Session.envelope`: schema, build `1.0.0`, content version, config id, seed, initial hash, ordered commands, periodic hashes every 5 commands, invalid count, assists, result, final hash).
-- **Launch token and sign-in:** `StarHermit.init()` reads `#game_token=` (library) or `#access_token=` (sign-in return), strips it, takes the slug from `game_scope` and renews the token before expiry; if renewal is refused the top bar returns to `offline-capable`, the sign-in button returns and the name field unlocks. On `*.starhermit.com` without a token the title shows "Sign in with StarHermit" (`StarHermit.signIn()`); hidden when signed in or running locally.
-- **Identity:** the top bar shows "Playing as <nickname> · sync status" from `StarHermit.profile()` (nickname, `Player <id>` fallback).
-- **Cloud save:** the checksummed progress document is mirrored with `StarHermit.saveJSON` (2 s debounce) to `/api/v1/me/cloud-saves/game:<slug>`, flushed with keepalive on `pagehide`/hidden; remote wins on boot (`loadJSON`, validated by `CPSession.loadProgressRaw`). localStorage stays the offline cache. Writes after a load are conditional (the SDK sends the slot's ETag); when another device saved first the SDK refuses the write and emits `saveconflict`, and the game reloads the slot, merges it with local progress (`CPSession.mergeProgress`: the better star count per stage, every completion and daily from either side, the larger cube total), adopts the merge and saves it back. The in-progress round lives in the local snapshot and is untouched.
-- **Language:** Automatic follows the account's preferred language (`GET /api/v1/me/language`); an explicit choice is saved in the per-player settings key `ui.language` (§9).
-- **Report a problem / crashes:** Settings → Graphics → **Report a problem** (signed in only, from `game-options.js`) files a bug report through `StarHermit.reportBug` with a small non-personal `context.json` (viewport, language, FPS cap, audio limit); uncaught errors are filed as crash reports through `StarHermit.captureCrashes` (SDK-capped).
-- **Settings KV:** the whole settings object (volumes, mute, captions, reduced motion, high contrast, large text, left-handed, confirm pop, theme, graphics) is written with `patchSettings` (400 ms debounce) on every change, after the boot read of `getSettings()` has been applied over the local values (platform wins).
-- **Invite link:** when signed in the title shows "Invite a friend": copies `StarHermit.inviteLink()` and confirms with a toast (shows the link if copying is blocked).
-- **Controls:** keydown is routed by `event.code` through `StarHermit.loadBindings(defaults)`; the Help controls table shows the effective keys. No in-game rebinding UI.
-
-**Leaderboard:** when signed in, every finished round posts its total through `StarHermit.submitScores` (a practice session whose `score-script.js` posts it to the `high-score` board, integer, higher is better, 0–1,000,000), and the results screen shows "Leaderboard rank: #N". Lessons post nothing. Standalone play posts nothing.
-
-**Not used:** platform achievements (achievements are local), matchmaking, matchmaking, session invites, chat, replays, realtime rooms, voice — the game is solo and `server.js` is not a platform session script. Platform strings (status, sign-in, invite, toasts, leaderboard line) follow the game language like every other string. Without a token the game makes no StarHermit calls.
+- **Save:** the checksummed progress document (`v, stars, completed, dailiesDone, totalCubes, sum`) is the game's save (`saves`, schema 1): on the device at once, synced to the account's cloud slot when signed in. When the account's save replaces the device's (another device saved last) it is merged in (`CPSession.mergeProgress`: the better star count per stage, every completion and daily from either side, the larger cube total); a conflict resolves to the same merge. **Migration:** the browser build's cloud save (the JS SDK's `saveJSON` of the same document, key `game:<slug>`) shows as `saves.foreign()`; it is validated by its checksum, merged with this device's progress and saved over the slot once (`replaceForeign`). Guests' browser localStorage progress from the old build does not carry over (the engine's storage is its own).
+- **Device storage** (the localStorage shim over `storage`): achievements (`cubepop:achievements:v1`), the saved round (`cubepop:saved-round:v1`), today's best (`cubepop:daily-best:v1`), the device's daily board (`cubepop:daily-boards:v1`, last 14 days, top 50 per day, one entry per name keeping the better run), Score Chase runs (`cubepop:score-best:v1`) and the board name (`cubepop:name`), as the browser build kept them on the device.
+- **Settings:** the game's options (`captions`, `leftHanded`, `theme`) are `settings` (`game.<key>`, synced with the account). The browser build's account settings (its settings object patched key by key, and `ui.language`) are read once as legacy settings: `captions`, `leftHanded` and `theme` carry over unless set since, then every old key is removed. Volumes, mute, graphics and the accessibility options are the runtime's.
+- **Player and clock:** the top bar shows `offline-capable` for guests, else "Playing as <name> · progress synced | saving… | cloud sync unavailable". The daily's date and the reset countdown use the platform's clock (`serverNow()`), the device's UTC date until it answers or offline.
+- **Sign-in and invite:** guests see "Sign in with StarHermit" on the title (`requestSignIn`); signed in, "Invite a friend" copies the invite link (fetched ahead) to the clipboard with a toast, or shows it.
+- **Leaderboard:** when signed in, every finished round (not lessons) posts its total through `score-script.js`: a practice session whose socket carries `{ type: 'result', scores: { 'high-score': total } }` (as the JS SDK's `submitScores` did); the script range-checks it and posts it to the `high-score` board (integer, higher is better, 0–1,000,000), and the results show "Leaderboard rank: #N" from the board's entries.
+- **Daily board:** local to the device; guests type a name (`Guest` by default), signed in the account name is used.
+- **Replay envelope:** `Session.envelope` (schema, build, content version, config id, seed, initial hash, ordered commands, periodic hashes, invalid count, assists, result, final hash); Copy replay envelope puts it on the clipboard.
+- **Controls:** `control.*` and `engine.gamepad.*` in the manifest; the runtime rebinds them.
+- **Not used:** platform achievements (achievements stay local), matchmaking, invites to sessions, chat, realtime rooms, voice.
 
 ## 12. Technical architecture
 
-- **Module contract:** `rules` is pure (no DOM, no clock, no `Math.random`); `content` is data plus the daily/tutorial generators; `session` is the only writer of rules state on the client and owns ids, undo, snapshots and the envelope; `render` consumes state snapshots and event lists; `ui` owns screens, timers and settings; `audio` owns WebAudio. Script order in `index.html`: import map → rng → rules → content → audio → platform → session → gfx → gfx-panel → ui → main (module). `gfx` is pure (no DOM, no three.js) and shared by the panel and the renderer.
-- **Determinism and replay:** 32-bit mulberry32 with stored `rngState`; quantised `elapsedMs`; `hashState` over a stable-stringified state without `events`; `replay` re-simulation verifies envelopes. `tools/validate-content.js` proves legality, reachable goals, no soft locks and bounded duration for every shipped config.
-- **Persistence (localStorage):** `cubepop:settings:v1`, `cubepop:progress:v1` (`v, stars, completed, dailiesDone, totalCubes, sum` — corrupt checksum resets safely), `cubepop:achievements:v1`, `cubepop:saved-round:v1` (config, serialised state, commands, init hash), `cubepop:daily-best:v1`, `cubepop:daily-boards:v1`, `cubepop:score-best:v1`, `cubepop:name`. Tutorials are never snapshotted.
-- **Rendering budget:** one `InstancedMesh` per colour for cubes and one for charms (≤ 64 instances each), ≤ 12 special groups, 80 pooled marker quads, one 2048-point particle buffer, ≤ 25 environment meshes, one 70-point mote cloud: about 35 draw calls. Rendering stops while the tab is hidden. The drawing buffer follows the container's size every frame, so layout changes never crop the wall.
-- **Resilience:** WebGL absent → compatibility card and grid mode; context lost → alert and grid mode with the round intact; missing images hide themselves (`onerror`), missing texture keeps the flat colour, missing clip keeps the synth cue; API failure keeps the game playable.
-- **E2E automation:** `tests/e2e.mjs` serves the repo with an embedded static server (no API), launches system Chrome via `playwright-core`, and for desktop (1280×800) and mobile (390×844, touch) clicks the real buttons: settings → reduced motion, daily screen local board, Play, keyboard pops chosen by reading the mirror grid, Undo, Hint, Pause/Resume, plays stage 1 to the results card, returns to the title and checks persisted progress. A Graphics step picks Low then High, overrides bloom, turns on the frame rate, reloads and checks everything persisted, then returns to Auto (Low on the software GPU) and confirms the studio canvas renders at Low; a last step plays a round at Ultra. Any console error, warning or page error fails the run.
+- **Module contract:** `rules` is pure (no DOM, no clock, no `Math.random`); `content` is data plus the daily/tutorial generators; `session` is the only writer of rules state on the client and owns ids, undo, snapshots and the envelope; `render.ts` consumes state snapshots and event lists; `main.ts` owns phases, timers and the round; `screens.ts` draws; `audio.ts` owns sound. The classic scripts are loaded unchanged with `loadClassic` (`native/classic.ts`), so the node tests run the shipped code.
+- **Time:** `setFixedRate(60)`; the round clock (`Session.clock`) counts fixed steps of the active round only, so pauses, a hidden window and slow frames never cost time; the countdown, the pop timeline and time limits use the same steps, and play scripts replay exactly.
+- **Determinism and replay:** 32-bit mulberry32 with stored `rngState`; quantised `elapsedMs`; `hashState` over a stable-stringified state without `events`. Score Chase seeds come from the platform's clock per run.
+- **Rendering budget:** one `InstancedMesh` per colour for cubes and one for charms (capacity twice the cells, for refills arriving while popped cubes shrink), ≤ 12 special groups, 80 pooled markers, one 2048-point confetti cloud, ≤ 25 environment meshes, one mote cloud. The studio draws only during a round (`renderer.camera` is null on menus).
+- **Resilience:** missing images leave the art out (the title mosaic shows), a missing wood texture keeps the flat colour, a missing clip is silent; platform failures keep the game playable offline.
 
 ## 13. Testing and acceptance criteria
 
-`npm test` runs `tests/rules.test.js` (37 tests), `tests/platform.test.mjs` (SDK + adapter in a vm sandbox with stubbed `fetch` and launch hash: token read and fragment strip, profile nickname, `game:<slug>` cloud-save round-trip, debounced settings patch, binding overrides, invite link, a 412 on a cloud write reported as a save conflict and cleared by a reload, `mergeProgress`, zero fetches standalone), `tests/i18n.test.mjs` (every `T`/`N` key in code, every `data-i18n` key in `index.html` and every content display field exists in all nine locales with the same placeholders; no stale keys) and `tests/gfx.test.js` (GPU detection, auto/explicit presets, overrides, scale clamp, preset clears overrides, cost summary). Rules tests cover: deterministic creation; fresh boards always have a move; group detection; every rejection reason; pop/goal/refill; monotonic tick; gravity; rocket at 5+, column orientation, bomb at 8+; row-rocket and bomb blast shapes; chains; specials never join groups; win bonuses; move, time and resign losses; reshuffle guard; endless banking; hint preferences; serialisation round-trip; replay property (same log ⇒ same hashes); failed commands never mutate; malformed-command fuzz; 200-seed random-play fuzz (no NaN, no dead states); all 40 journey stages well-formed and the first five greedy-winnable; challenges/practice/score chase well-formed; daily determinism; lesson fixtures legal and goals reachable; golden outcome hash; interrupted + resumed equals continuous play; tick expiry.
+`npm test` runs:
+- `tests/rules.test.js` (37 tests): deterministic creation; fresh boards always have a move; group detection; every rejection reason; pop/goal/refill; monotonic tick; gravity; rocket at 5+, column orientation, bomb at 8+; blast shapes; chains; specials never join groups; win bonuses; move, time and resign losses; reshuffle guard; endless banking; hints; serialisation; replay property; pure failed commands; fuzz; journey/challenge/practice/score chase well-formed; daily determinism; lesson fixtures; golden hash; interrupted + resumed equals continuous play; tick expiry.
+- `tests/session.test.mjs`: the `Session.clock` hook, the checksum `platform.ts` seals merged progress with, the browser build's cloud document validating and merging without losses (and a tampered one refused), the snapshot round trip with deduplicated ids, the device's daily board.
+- `tests/i18n.test.mjs`: every `T`/`N` key in `js/*.js` and `native/*.ts` and every content display field exists in all nine locales with the same placeholders; no stale keys.
+- `tools/validate-content.js`: legality, reachable goals, no soft locks for every shipped config.
+- `tests/native.mjs`: the web index matches the files; `tsc` (TypeScript 5.9, the engine's d.ts, no skipLibCheck); `starhermit check .` with zero warnings; every `tests/native/*.play` as a signed-out `--render-check` run of the real UI: `screens.play` (every screen and back, a Score Chase run started and left, the reset question), `journey-first-stage.play` (stage 1 played by keys to the results, Next opens stage 2, Leave round → Resume saved round), `learn-lessons.play` (all seven lessons through Next), `practice-assists.play` (pop, Undo, Hint, a refused pop, Pause → Leave → Resume saved round, the round to its results), `challenge-timer.play` (Speed Pop: the 15-second warning and Time is up), `touch-pop.play` (a touch pop on the wall and the tray by touch). `npm run plays` regenerates the generated ones from the rules.
 
-`npm run test:e2e` passes when both viewport passes complete every step above with zero console errors and zero same-origin `/api` or `/ws` requests, and a signed-in pass per viewport (platform API stubbed) shows the nickname, loads the `game:cube-pop` save, strips the fragment, applies a platform setting, shows the Invite a friend toast on-screen and lists a platform key binding in Help; then, with the account's preferred language stubbed to fr-CA, Automatic resolves to French, Settings → Language → Deutsch re-renders the settings screen and the title menu and saves `ui.language`, Report a problem posts a bug report (German screenshot, no horizontal overflow), and Pause → Settings → Italiano mid-round re-renders the HUD and goal rail. `node tools/smoke-server.js` boots `server.js`, plays a daily round, submits the envelope and reads back the board.
+`npm run test:browser` (`tools/browser-play.mjs`) serves the package on loopback and plays it in Chrome on the machine's GPU at 1366×768, a 390×844 phone and an 844×390 landscape phone (Play, the countdown, a pop by keys or by tap, Pause by key or tap, Leave round to the title with Resume saved round), failing on console errors or warnings or the runtime's error screen. `npm run test:server` boots `server.js` and round-trips its legacy daily routes.
 
-QA bar (agents/qa.md) as checkable statements: (1) a new player sees instructions in the first stage intro, the Learn lessons and Help before any mechanic is required; (2) every mode, setting, overlay and button is reachable and works in the browser at 1280×800 and 390×844; (3) no console errors or warnings during a full playthrough; (4) no text or control is cut off on desktop, portrait or landscape mobile; (5) daily scores go through the StarHermit game script.
+QA bar: (1) a new player sees instructions in the first stage's rule card, the Learn lessons and Help before any mechanic is required; (2) every mode, setting, dialog and button is reachable and works natively and in the browser at desktop, portrait and landscape phone sizes; (3) no console errors or warnings during a full playthrough; (4) no text or control is cut off; (5) finished rounds go to the leaderboard through the StarHermit game script.
 
 ## 14. Performance budgets
-60 fps on desktop at High; 30 fps floor on low-end mobile at Low (DPR 1, no shadows, no post chain, 30 particles per burst); adaptive resolution trades pixels for frame time on every preset. Frame work is instance-matrix writes for ≤ 64 cubes + charms, a 2048-point particle update and one render; no per-frame allocations beyond three reusable math objects. Total shipped payload ≈ 0.7 MB core (three.js 670 KB) + 60 KB images + ~0.5 MB audio (lazy) + 1.4 MB optional model (not loaded).
+60 fps on desktop at High; Low draws no shadows, no post chain and 30-particle bursts. Frame work is instance-matrix writes for ≤ 64 cubes + charms, a 2048-point confetti update (only while confetti flies) and the UI; the runtime adapts resolution. Payload ≈ 1.1 MB (60 KB images, ~0.5 MB audio loaded one clip at a time).
 
 ## 15. Asset inventory
 
 | Path | Purpose | Source | Status |
 |---|---|---|---|
-| `assets/title-keyart.webp` (1200×675, 34 KB) | Title hero over the mosaic canvas | FLUX.2 klein, seed 2712 | generated in this pass, wired (`#title-keyart`) |
-| `assets/results-banner.webp` (1024×320, 12 KB) | Win / lesson-complete banner in the results card | FLUX.2 klein, seed 2713 | generated in this pass, wired (`#results-banner`) |
-| `assets/table-wood.webp` (512×512, 3 KB) | Repeating wood grain on the studio table | FLUX.2 klein, seed 2715 | generated in this pass, wired (`render.js` `_loadWoodTexture`) |
-| `assets/toy-rocket.glb` (1.4 MB) | Hero toy-rocket prop for specials / title | FLUX.2 klein seed 2714 → TRELLIS seed 2714 | generated in this pass, shipped, not yet wired (no GLTF loader vendored) |
-| `coverart.png` (1200×675, 221 KB) | Platform cover | FLUX.2 klein seed 2712 + ffmpeg title overlay | replaced placeholder in this pass |
-| `icon.png`, `favicon.svg` | Platform icon, tab icon | authored | shipped |
-| `sfx/*.opus` (16 original clips) | Event sounds, §8 | MOSS-SFX v2, 100 steps | shipped |
-| `sfx/countdown-tick.opus`, `countdown-go.opus`, `goal-fill.opus`, `time-warning.opus`, `studio-ambience.opus` | New cues, §8 | MOSS-SFX v2, 100 steps | generated in this pass, wired with synth fallbacks |
-| `vendor/three.module.min.js` | Renderer library | three.js 0.160.1 | shipped |
-| `vendor/three/addons/` | EffectComposer, Render/Shader/Output/GTAO/UnrealBloom/SMAA passes, FXAA/GTAO/SMAA/copy/output/luminosity/denoise shaders, SimplexNoise, RoomEnvironment | three.js 0.160.1 `examples/jsm` (same revision) | shipped |
+| `assets/title-keyart.webp` (1200×675, 34 KB) | Title hero over the mosaic | FLUX.2 klein, seed 2712 | wired (`screens.ts` hero) |
+| `assets/results-banner.webp` (1024×320, 12 KB) | Win / lesson-complete banner in the results | FLUX.2 klein, seed 2713 | wired |
+| `assets/table-wood.webp` (512×512, 3 KB) | Repeating wood grain on the studio table | FLUX.2 klein, seed 2715 | wired (`render.ts`) |
+| `assets/ui-style.json` | The UI's styles and tokens | `starhermit css tools/ui-style.css` | generated (`npm run css`) |
+| `coverart.png` (1200×675, 221 KB), `cover.jpg` | Platform cover | FLUX.2 klein seed 2712 + ffmpeg title overlay | shipped |
+| `icon.png` | Platform and web page icon | authored | shipped |
+| `sfx/*.opus` (21 clips) | Event sounds and room tone, §8 | MOSS-SFX v2, 100 steps | shipped |
+
+The browser build's unused `assets/toy-rocket.glb` (1.4 MB, never loaded) was removed with the browser client.
 
 ## 16. Known limitations
 
 - A fired special's own cell is counted twice (once by the caller, once inside `detonate`'s blast loop): +10 points and +1 goal count extra per fired special. It is deterministic and the server replays the same code, so leaderboards stay consistent; fixing it changes golden hashes.
 - Resuming a saved round always starts theme-0 music and cannot resume tutorial lessons (by design they are never snapshotted).
 - The camera orbit persists between rounds until the player presses C / Camera.
-- Score Chase seeds are `Math.random()`: runs are replayable from the envelope but not shareable by seed; its best list is local only.
-- Achievements and progress are localStorage only; clearing site data loses them.
-- The ambience bed first plays from the second round of a session (the clip decodes during the first round while the synth hum runs).
-- `tests/e2e.mjs` does not play a daily round, so saving to the local daily board is untested end to end.
-- `assets/toy-rocket.glb` ships unused.
+- Score Chase seeds differ per run: runs are replayable from the envelope but not shareable by seed; its best list is local only.
+- Achievements, the saved round and the daily board are device storage only; guests' old browser localStorage progress does not migrate to the engine build (signed-in cloud saves do).
+- A sound whose clip is still loading is silent (no synthesised stand-in); in a browser the clips load after the first press.
+- The "Finish the stage" lesson now completes as a lesson (the browser build ended it as an ordinary round, so it never counted and "Second chances" stayed locked).
+- The per-effect graphics overrides of the old Graphics panel are not offered: the runtime's Options choose a level.
+- The replay envelope is copied, not shown (the old page's collapsible JSON).
+- While the stats float over the wall on short landscape screens, a tap on them reaches the cube underneath.
 
 ## 17. Design intent not yet implemented
 
-- Load `assets/toy-rocket.glb` (vendored GLTFLoader) for the rocket special and a spinning title prop, falling back to the procedural cone rocket.
-- Send achievements through the platform; global and friends boards for Score Chase with a seed shared per UTC day (identity and validated daily submissions are done).
+- A modelled toy rocket for the rocket special and a spinning title prop (the glTF asset was never wired and is gone).
+- Send achievements through the platform; global and friends boards for Score Chase with a seed shared per UTC day.
 - Authored music stems per theme in place of the synthesised pentatonic loop.
 - Count the fired special's cell once (with a golden-hash update and content version bump).
-
-## Browser interference
-
-`browser-guard.js` (loaded from `index.html`) suppresses browser UI that gets in the way of play: the right-click context menu, the iOS long-press callout, copy / cut / paste, and page text selection. Text fields (inputs, textareas, selects, contenteditable) keep normal selection, context menu and clipboard behaviour.
-
-
-## Sound and frame-rate options
-
-The options panel includes Sound controls for master, music, effects and UI volume, a mute that preserves volume levels, and an Auto or manual concurrent-sound limit (1–64). Changes apply immediately with perceptual volume curves. A shared allocator bounds Web Audio and media playback, including loops and scheduled sources. Graphics includes Auto display refresh or a custom maximum frame rate from 1–1000 FPS; rendering is paced independently of simulation and input. Preferences persist locally, with FPS stored per detected GPU, and reconcile with Starhermit settings when signed in. The controls support keyboard and touch input and the supported English, Spanish, German, French, Portuguese and Italian locales.
