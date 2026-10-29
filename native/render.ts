@@ -24,7 +24,7 @@ import {
   CylinderGeometry, DirectionalLight, ExtrudeGeometry, Fog, Group, HemisphereLight, IcosahedronGeometry, InstancedMesh, Matrix4,
   Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial, Object3D, OctahedronGeometry,
   PerspectiveCamera, PlaneGeometry, PMREMGenerator, Plane, Points, PointsMaterial, Quaternion, Raycaster, RepeatWrapping,
-  RoomEnvironment, Shape, SphereGeometry, SRGBColorSpace, TextureLoader, TorusGeometry, Vector3, pointerToNdc, renderer, scene,
+  OrthographicCamera, RoomEnvironment, Shape, SphereGeometry, SRGBColorSpace, TextureLoader, TorusGeometry, Vector3, pointerToNdc, renderer, scene,
   type Material, type Texture,
 } from "starhermit:scene";
 import { OffscreenCanvas } from "starhermit:canvas";
@@ -36,7 +36,7 @@ const SPACING = 1.04; // cube pitch on the wall
 const CUBE = 0.94; // cube edge
 const BASE_Y = 1.05; // height of the wall's bottom row (on the table top)
 const POP_MS = 160, FALL_MS = 220, BLAST_MS = 260, SHUFFLE_MS = 450;
-const KEY = 2.2 / PI;
+const KEY = 2.2;
 
 type Palette = Theme["palette"];
 interface Entity {
@@ -67,9 +67,9 @@ keyLight.shadow.radius = 3;
 const keyDir = new Vector3(4, 8, 6).normalize();
 scene.add(keyLight);
 scene.add(keyLight.target);
-const fillLight = new HemisphereLight(0xffffff, 0x8a6a4a, 0.9 / PI);
+const fillLight = new HemisphereLight(0xffffff, 0x8a6a4a, 0.9);
 scene.add(fillLight);
-const ambient = new AmbientLight(0xffffff, 0.25 / PI);
+const ambient = new AmbientLight(0xffffff, 0.25);
 scene.add(ambient);
 // A cool rim from the left so cube bevels read against the wall (detailed looks).
 const rimLight = new DirectionalLight(0xcfe0ff, 0);
@@ -227,11 +227,21 @@ function charmGeo(idx: number): BufferGeometry {
 }
 
 interface LitParams { color: number; roughness?: number; metalness?: number; clearcoat?: number; clearcoatRoughness?: number; envMapIntensity?: number; map?: Texture | null }
+/** r160's scene.environment was scaled by each material's envMapIntensity; three r163+ (the engine) applies
+ * scene.environmentIntensity instead, so every standard material takes the room as its own envMap. */
+function envOf(): Texture | null { return look?.reflections ? envMap() : null; }
+function bindEnv(): void {
+  const env = envOf();
+  scene.traverse((o) => {
+    const m = (o as Mesh).material as MeshStandardMaterial | MeshStandardMaterial[] | undefined;
+    for (const x of Array.isArray(m) ? m : m ? [m] : []) if ("envMapIntensity" in x && x.envMap !== env) x.envMap = env;
+  });
+}
 /** Lit material in the look's class: Lambert on Low, standard above, clear-coated physical where asked on High/Ultra. */
 function lit(p: LitParams, physical = false): Material {
   const kind = look ? look.budget.material : "lambert";
   if (kind === "lambert") return new MeshLambertMaterial({ color: p.color, map: p.map ?? null });
-  const sp = { color: p.color, map: p.map ?? null, roughness: p.roughness ?? 1, metalness: p.metalness ?? 0, envMapIntensity: p.envMapIntensity ?? 1 };
+  const sp = { color: p.color, map: p.map ?? null, roughness: p.roughness ?? 1, metalness: p.metalness ?? 0, envMapIntensity: p.envMapIntensity ?? 1, envMap: envOf() };
   if (kind === "physical" && physical) return new MeshPhysicalMaterial({ ...sp, clearcoat: p.clearcoat ?? 0, clearcoatRoughness: p.clearcoatRoughness ?? 0 });
   return new MeshStandardMaterial(sp);
 }
@@ -348,7 +358,7 @@ function makeSpecialMesh(s: number, colorIdx: number, x: number, y: number): Gro
   let spark: Mesh | null = null;
   if (s === 3) { // bomb: a sphere with a fuse and a glowing spark (bloom catches it)
     top = new Mesh(new SphereGeometry(0.34, 18, 12), dark);
-    const fuse = new Mesh(new CylinderGeometry(0.04, 0.04, 0.22, 6), new MeshStandardMaterial({ color: 0xffd76a, emissive: 0x664400 }));
+    const fuse = new Mesh(new CylinderGeometry(0.04, 0.04, 0.22, 6), new MeshStandardMaterial({ color: 0xffd76a, emissive: 0x664400, envMap: envOf() }));
     fuse.position.y = 0.42;
     g.add(fuse);
     spark = new Mesh(new SphereGeometry(0.07, 10, 8), new MeshBasicMaterial({ color: new Color(3.0, 2.2, 0.9) }));
@@ -356,9 +366,9 @@ function makeSpecialMesh(s: number, colorIdx: number, x: number, y: number): Gro
     g.add(spark);
   } else { // rocket: a cone on a stick; row rockets lie flat, column rockets stand
     const t = new Group();
-    const body = new Mesh(new ConeGeometry(0.2, 0.5, 10), new MeshStandardMaterial({ color: 0xf4f0e6, roughness: 0.35 }));
+    const body = new Mesh(new ConeGeometry(0.2, 0.5, 10), new MeshStandardMaterial({ color: 0xf4f0e6, roughness: 0.35, envMap: envOf() }));
     body.position.y = 0.25;
-    const fin = new Mesh(new CylinderGeometry(0.12, 0.16, 0.3, 8), new MeshStandardMaterial({ color: 0xd84f45, roughness: 0.5 }));
+    const fin = new Mesh(new CylinderGeometry(0.12, 0.16, 0.3, 8), new MeshStandardMaterial({ color: 0xd84f45, roughness: 0.5, envMap: envOf() }));
     fin.position.y = -0.05;
     t.add(body); t.add(fin);
     if (s === 1) t.rotation.z = -PI / 2;
@@ -596,6 +606,8 @@ function frameCamera(): void {
   const aspect = view.w / view.h;
   const tan = Math.tan((camera.fov * PI) / 360);
   camDist = Math.max(h / (2 * tan), w / (2 * tan * aspect)) + 1.2;
+  camera.aspect = view.w / view.h;
+  camera.updateProjectionMatrix();
   camera.setViewOffset(view.w, view.h, -view.x, -view.y, view.W, view.H);
   applyCamera();
 }
@@ -657,8 +669,10 @@ function fitShadow(): void {
   const top = BASE_Y + Math.max(rows, 4) * SPACING + 0.6;
   const center = new Vector3(0, top / 2, 0.2);
   const radius = Math.hypot(w, top / 2, 2.6);
-  // The engine fits the directional shadow to the view out to `distance` (three.js fitted its ortho camera).
-  keyLight.shadow.distance = 20 + radius * 2;
+  const cam = keyLight.shadow.camera as OrthographicCamera;
+  cam.left = -radius; cam.right = radius; cam.top = radius; cam.bottom = -radius;
+  cam.near = 0.5; cam.far = 20 + radius * 2;
+  cam.updateProjectionMatrix();
   keyLight.target.position.copy(center);
   keyLight.position.copy(center).addScaledVector(keyDir, 20);
 }
@@ -687,10 +701,10 @@ export function applyLook(next: Look): void {
   keyLight.castShadow = shadows;
   if (shadows) keyLight.shadow.mapSize = next.shadows;
   // Image-based lighting replaces most of the flat fill when reflections are on.
-  scene.environment = next.reflections ? envMap() : null;
-  fillLight.intensity = (next.reflections ? 0.7 : 0.9) / PI;
-  ambient.intensity = (next.reflections ? 0.1 : 0.25) / PI;
-  rimLight.intensity = next.detailed ? 0.6 / PI : 0;
+  scene.environment = null; // per-material envMaps (bindEnv)
+  fillLight.intensity = next.reflections ? 0.7 : 0.9;
+  ambient.intensity = next.reflections ? 0.1 : 0.25;
+  rimLight.intensity = next.detailed ? 0.6 : 0;
   motes.visible = next.animated;
   // High particles: larger soft round confetti; Low keeps the cheap squares.
   pMat.map = next.particlesHigh ? dotTex : null;
@@ -718,6 +732,7 @@ export function applyLook(next: Look): void {
     rebuildBoardMeshes();
     if (lastState) syncToState(lastState);
   }
+  bindEnv();
   updateMotes(ambientT);
 }
 export function ambientLook(): boolean { return !!look && look.animated; }
