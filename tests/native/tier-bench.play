@@ -1,0 +1,114 @@
+# Tier bench (tools/engine-tier-bench.mjs): journey stage 1 (First Pops, a
+# fixed board) played by keys as journey-first-stage.play does: pops, falling
+# cubes, confetti bursts, dust motes, the studio room.
+until 300 Cube Pop
+frames 30
+click =Journey
+until 60 Forty authored stages
+frames 10
+click First Pops
+until 120 Goals
+frames 120
+measure start
+key ArrowDown 1
+frames 1
+key ArrowDown 1
+frames 1
+key ArrowDown 1
+frames 1
+key ArrowRight 1
+frames 1
+key ArrowRight 1
+frames 1
+key ArrowRight 1
+frames 1
+key Enter 1
+frames 60
+key ArrowUp 1
+frames 1
+key ArrowUp 1
+frames 1
+key Enter 1
+frames 59
+key ArrowRight 1
+frames 1
+key ArrowRight 1
+frames 1
+key Enter 1
+frames 59
+key ArrowDown 1
+frames 1
+key Enter 1
+frames 59
+key ArrowUp 1
+frames 1
+key ArrowUp 1
+frames 1
+key ArrowLeft 1
+frames 1
+key Enter 1
+frames 46
+key ArrowDown 1
+frames 1
+key ArrowDown 1
+frames 1
+key ArrowDown 1
+frames 1
+key ArrowDown 1
+frames 1
+key ArrowLeft 1
+frames 1
+key ArrowLeft 1
+frames 1
+key ArrowLeft 1
+frames 1
+key Enter 1
+frames 59
+key ArrowUp 1
+frames 1
+key ArrowUp 1
+frames 1
+key ArrowUp 1
+frames 1
+key ArrowUp 1
+frames 1
+key ArrowLeft 1
+frames 1
+key Enter 1
+frames 63
+key ArrowDown 1
+frames 1
+key ArrowRight 1
+frames 1
+key ArrowRight 1
+frames 1
+key ArrowRight 1
+frames 1
+key Enter 1
+frames 60
+key ArrowUp 1
+frames 1
+key ArrowLeft 1
+frames 1
+key ArrowLeft 1
+frames 1
+key Enter 1
+frames 63
+key ArrowRight 1
+frames 1
+key Enter 1
+frames 46
+key ArrowDown 1
+frames 1
+key ArrowDown 1
+frames 1
+key ArrowRight 1
+frames 1
+key ArrowRight 1
+frames 1
+key ArrowRight 1
+frames 1
+key Enter 1
+frames 71
+frames 60
+measure stop

@@ -694,7 +694,7 @@ export function applyLook(next: Look): void {
   const shadows = next.shadows > 0;
   renderer.shadowMap.enabled = shadows;
   keyLight.castShadow = shadows;
-  if (shadows) keyLight.shadow.mapSize = next.shadows;
+  if (shadows) keyLight.shadow.mapSize = next.shadows; // the level's size: at minor 23+ the engine keeps the game's mapSize
   // Image-based lighting replaces most of the flat fill when reflections are on.
   scene.environment = null; // per-material envMaps (bindEnv)
   fillLight.intensity = next.reflections ? 0.7 : 0.9;
@@ -704,13 +704,14 @@ export function applyLook(next: Look): void {
   // High particles: larger soft round confetti; Low keeps the cheap squares.
   pMat.map = next.particlesHigh ? dotTex : null;
   pMat.size = next.particlesHigh ? 0.16 : 0.09;
-  renderer.ao = next.ao === "off" ? null : {
-    blendIntensity: 0.85, radius: 0.45, distanceExponent: 1.2, thickness: 1.0, scale: 1.0, samples: next.ao === "high" ? 16 : 8, resolution: next.budget.aoRes,
-    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: next.ao === "high" ? 6 : 4, rings: 2, samples: next.ao === "high" ? 16 : 8, radiusExponent: 2 },
+  const ao = next.ao, fullAo = !!ao && ao.resolution >= 1; // the engine's "high" AO: full resolution
+  renderer.ao = ao && {
+    blendIntensity: 0.85, radius: 0.45, distanceExponent: 1.2, thickness: 1.0, scale: 1.0, samples: ao.samples, resolution: ao.resolution,
+    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: fullAo ? 6 : 4, rings: 2, samples: ao.denoiseSamples, radiusExponent: 2 },
   };
   // A high threshold: only sparks, sparkles and hot highlights bloom (UnrealBloomPass 0.45, 0.4, 0.9).
   // minor 30: this page ran three r160, so r160's UnrealBloomPass (model "r160") at the page's own strength.
-  renderer.bloom = next.bloom ? { model: "r160", strength: 0.45, radius: 0.4, threshold: 0.9, resolution: next.budget.bloomRes } : null;
+  renderer.bloom = next.bloom === null ? null : { model: "r160", strength: 0.45, radius: 0.4, threshold: 0.9, resolution: next.bloom };
   // js/render.js GradeShader (before OutputPass, so on clamped linear light): a gentle S-curve, a touch more
   // saturation, warm highlights / cool shadows and the 0.2 vignette.
   renderer.grade = next.grade ? {
