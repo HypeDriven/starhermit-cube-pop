@@ -20,7 +20,6 @@ import * as ui from "starhermit:ui";
 import { TextureLoader, type Texture } from "starhermit:scene";
 import { Content, RNG, Rules, Sess, type DailyEntry } from "./classic.ts";
 import { T, currentLocale } from "./i18n.ts";
-import { icon } from "./glyphs.ts";
 import * as platform from "./platform.ts";
 import * as render from "./render.ts";
 import {
@@ -48,6 +47,12 @@ function textWidth(text: string, style: string | readonly string[], kind?: "butt
 }
 const buttonWidth = (text: string, style: readonly string[]): number => textWidth(text, style, "button") + 4;
 
+/** Colour `idx`'s icon (js/content.js COLORS: ♥ ★ ▲ ◆ ☾ ✿) as text centred at (cx, cy), `r` its
+ * radius in window pixels; a symbol the system's faces lack draws from the engine's StarHermit Emoji. */
+function icon(idx: number, cx: number, cy: number, r: number, color: string): void {
+  const ch = Content.COLORS[idx % Content.COLORS.length]!.icon, size = r * 2.2;
+  draw.text(ch, cx, cy - draw.measureText(ch, { size }).height / 2, { size, color, align: "center" });
+}
 interface Btn { id: string; text: string; style?: string[]; disabled?: boolean; act: () => void; width?: number }
 const PLAIN = ["btn"];
 /** A button `width` wide (null: its text's); a label too long for it wraps inside. */
@@ -64,19 +69,9 @@ function button(b: Btn, width: number | null = null): void {
 }
 /** Buttons at their own widths in rows that wrap at `width` (CSS flex-wrap). */
 function flow(label: string, list: Btn[], width: number, align: "start" | "center" | "end" = "center", gap = 8): void {
-  const rows: Btn[][] = [[]];
-  let used = 0;
-  for (const b of list) {
-    const bw = Math.min(width, b.width ?? buttonWidth(b.text, b.style ?? PLAIN));
-    if (rows[rows.length - 1]!.length && used + gap + bw > width) { rows.push([]); used = 0; }
-    used += (rows[rows.length - 1]!.length ? gap : 0) + bw;
-    rows[rows.length - 1]!.push(b);
-  }
-  ui.column(label, () => {
-    rows.forEach((row, ri) => ui.row(`${label}-r${ri}`, () => {
-      for (const b of row) button(b, b.width ?? (buttonWidth(b.text, b.style ?? PLAIN) > width ? width : null));
-    }, { spacing: gap, align: "center" }));
-  }, { spacing: gap, align, width });
+  ui.row(label, () => {
+    for (const b of list) button(b, b.width ?? (buttonWidth(b.text, b.style ?? PLAIN) > width ? width : null));
+  }, { wrap: true, width, gap, justify: align, align: "center" });
 }
 /** Text up to `width` wide: one label when it fits, else a paragraph. */
 function para(text: string, width: number, cls = "body", id?: string, center = false): void {
@@ -138,7 +133,7 @@ function hero(w: number, h: number): void {
           if (x > r.x + r.width || y > r.y + r.height || x + size < r.x || y + size < r.y) continue;
           if (x < r.x || y < r.y || x + size > r.x + r.width || y + size > r.y + r.height) continue;
           draw.roundRect(x, y, size, size, size * 0.22, hexCss(def.color) + "d9", { clip });
-          icon(ci, x + size / 2, y + size / 2 + k, size * 0.2, "#fff6e8e6", hexCss(def.color));
+          icon(ci, x + size / 2, y + size / 2 + k, size * 0.2, "#fff6e8e6");
         }
       } else cover(keyart, r.x, r.y, r.width, r.height, 12 * k);
     },
@@ -496,7 +491,7 @@ function goalsRail(w: number, inline: boolean): void {
           draw: (r, s) => {
             const col = hexCss(colorHex(ci));
             draw.roundRect(r.x, r.y, r.width, r.height, 6 * s.scale, col);
-            icon(ci, r.x + r.width / 2, r.y + r.height / 2, 6.5 * s.scale, "#ffffff", col);
+            icon(ci, r.x + r.width / 2, r.y + r.height / 2, 6.5 * s.scale, "#ffffff");
           },
         });
         ui.style("goal-text").id(`goal-${g}-text`).label(text);

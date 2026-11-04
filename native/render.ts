@@ -183,13 +183,6 @@ new TextureLoader().loadAsync("assets/table-wood.webp").then((tex) => {
 }, () => { /* keep the flat colour */ });
 
 // -- geometry -----------------------------------------------------------------------------
-/** three.js BufferGeometry.center(): the bounding box's centre moved to the origin. */
-function centered(g: BufferGeometry): BufferGeometry {
-  g.computeBoundingBox();
-  const b = g.boundingBox!;
-  g.translate(-(b.min.x + b.max.x) / 2, -(b.min.y + b.max.y) / 2, -(b.min.z + b.max.z) / 2);
-  return g;
-}
 /** Soft-edged cube: a rounded square extruded with a bevel, inset so it measures exactly `size`. */
 function roundedCubeGeo(size: number): BufferGeometry {
   const b = size * 0.1, r = size * 0.1, h = size / 2 - b - r;
@@ -204,7 +197,7 @@ function roundedCubeGeo(size: number): BufferGeometry {
     depth: size - 2 * b, bevelEnabled: true, bevelThickness: b, bevelSize: b,
     bevelSegments: bud.cubeBevel, curveSegments: bud.cubeCurve,
   });
-  return centered(g);
+  return g.center();
 }
 function starGeo(radius: number, depth: number): BufferGeometry {
   const shape = new Shape();
@@ -214,7 +207,7 @@ function starGeo(radius: number, depth: number): BufferGeometry {
     if (i === 0) shape.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); else shape.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
   }
   shape.closePath();
-  return centered(new ExtrudeGeometry(shape, { depth, bevelEnabled: false }));
+  return new ExtrudeGeometry(shape, { depth, bevelEnabled: false }).center();
 }
 /** Per-colour charm shapes reinforce colour (shape ≠ colour-only). */
 function charmGeo(idx: number): BufferGeometry {

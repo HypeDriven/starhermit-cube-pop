@@ -15,7 +15,7 @@
 | `native/quality.ts` | The browser build's presets and budgets keyed by the runtime's quality tier and level |
 | `native/audio.ts` | Opus one-shots per event, the room-tone loop, the pentatonic music rendered into clips, captions |
 | `native/platform.ts` | The save (progress document, cloud-synced, foreign-save migration, conflict merge), the localStorage shim, the game's settings and legacy-setting migration, player, invite link, platform clock, leaderboard posting |
-| `native/classic.ts`, `native/i18n.ts`, `native/style.ts`, `native/glyphs.ts` | Loads the classic scripts below with their types; the interface language; the style sheet and high-contrast tokens; the colour icons drawn as shapes |
+| `native/classic.ts`, `native/i18n.ts`, `native/style.ts` | Loads the classic scripts below with their types; the interface language; the style sheet and high-contrast tokens |
 | `js/rng.js` | mulberry32 PRNG, FNV-1a `hashString`, three derived streams (rules / decor / AV) |
 | `js/rules.js` | Pure deterministic rules engine: `createGame`, `applyCommand`, legality, scoring, hints, hashing, serialisation |
 | `js/content.js` | Versioned content: 6 cube colours, 5 themes, 40 journey stages, 6 challenges, 3 practice presets, score-chase ruleset, daily generator, 7 lessons, 11 achievements |
@@ -142,7 +142,7 @@ Actions are declared in `starhermit.txt`; players rebind keys and pad buttons in
 
 ## 7. Art direction
 **Palette (style tokens, `tools/ui-style.css` → `assets/ui-style.json`):** background `#f6e3c8`, panel `#fff8ee`, ink `#3d2f23`, soft ink `#6d5b48`, accent `#e4574f`, accent-2 `#f2c14e`, focus `#2e6fe4`, danger `#b3352e`. The runtime's high contrast swaps to `#ffffff / #000000 / #b3001b / #0033cc` (`native/style.ts`) and the cubes to their high-contrast colours.
-**Cube colours** (`Content.COLORS`, high-contrast variant in brackets): Cherry `#e4574f` (`#d62828`), Lemon `#f2c14e` (`#f5d90a`), Leaf `#5da85f` (`#17a398`), Sky `#5b8fd4` (`#2e6fe4`), Grape `#9a6fc8` (`#8e24aa`), Tangerine `#ef8b4a` (`#ef6c00`). Charms are cream `#fff6e8`: sphere, star, cone, octahedron, torus, icosahedron. In the UI the colour icons (♥ ★ ▲ ◆ ☾ ✿) are drawn as shapes (`native/glyphs.ts`).
+**Cube colours** (`Content.COLORS`, high-contrast variant in brackets): Cherry `#e4574f` (`#d62828`), Lemon `#f2c14e` (`#f5d90a`), Leaf `#5da85f` (`#17a398`), Sky `#5b8fd4` (`#2e6fe4`), Grape `#9a6fc8` (`#8e24aa`), Tangerine `#ef8b4a` (`#ef6c00`). Charms are cream `#fff6e8`: sphere, star, cone, octahedron, torus, icosahedron. In the UI the colour icons (♥ ★ ▲ ◆ ☾ ✿) are drawn as text (`icon()` in `native/screens.ts`; a symbol the system's faces lack comes from the engine's StarHermit Emoji font).
 **Themes** (`Content.THEMES`, wall / table / accent): Sunny Studio `#f6e3c8 / #c98d5f / #ff9d5c`; Mint Workshop `#d8efe0 / #7fae8e / #6fce9a`; Twilight Loft `#2c3350 / #4a4f78 / #8fa8ff`; Candy Corner `#fbe0ea / #d887ac / #ff8fb8`; Ivory Attic `#f2eee6 / #b8a88e / #e8c07a`. Each also sets floor, frame, key-light and fog colours.
 
 **Shape language:** rounded-square extrusions with bevels (`roundedCubeGeo`: 10 % bevel plus 10 % corner radius, inset so the finished cube measures exactly its edge and neighbours leave a visible gap), specials as a cube with a cone-and-fin rocket or a sphere-and-fuse bomb on top, chunky shelf props (spheres and cones). UI uses 12 px radii, 2 px translucent borders and pill toasts.
