@@ -13,8 +13,6 @@
 | `native/screens.ts` | Every screen, the HUD, the countdown, pause and results dialogs, toasts and captions (starhermit:ui), layouts by window size |
 | `native/render.ts` | The studio on starhermit:scene: lights, room, table, shelf, cubes and charms, specials, confetti, dust motes, markers, camera fitted to the playfield, picking, the post chain per look |
 | `native/quality.ts` | The level's engine effects (`levelSettings()`) plus the browser build's art presets and budgets keyed by the level's quality tier |
-
-Low (quantum) keeps MSAA instead of the level's "off" until engine 1.36.2: engine 1.36.1 recolours fog, haze and translucent overlays without anti-aliasing.
 | `native/audio.ts` | Opus one-shots per event, the room-tone loop, the pentatonic music rendered into clips, captions |
 | `native/platform.ts` | The save (progress document, cloud-synced, foreign-save migration, conflict merge), the localStorage shim, the game's settings and legacy-setting migration, player, invite link, platform clock, leaderboard posting |
 | `native/classic.ts`, `native/i18n.ts`, `native/style.ts` | Loads the classic scripts below with their types; the interface language; the style sheet and high-contrast tokens |
