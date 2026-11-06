@@ -466,13 +466,15 @@
     ".stars": {
       "text": {
         "color": "$gold",
-        "size": 16
+        "size": 16,
+        "font": "StarHermit Emoji"
       }
     },
     ".stars-big": {
       "text": {
         "color": "$gold",
         "size": 22.4,
+        "font": "StarHermit Emoji",
         "letterSpacing": 2
       }
     },

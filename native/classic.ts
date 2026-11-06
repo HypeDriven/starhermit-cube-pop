@@ -1,5 +1,5 @@
 // The browser build's pure game scripts, shared unchanged with the node tests:
-// the string tables (js/locales/*.js, js/i18n.js), the seeded streams
+// the seeded streams
 // (js/rng.js), the deterministic rules engine (js/rules.js), the content
 // (js/content.js: colours, themes, Journey, challenges, practice, Score
 // Chase, the daily, lessons, achievements) and the session (js/session.js:
@@ -11,8 +11,7 @@
 import { loadClassic } from "starhermit:script";
 
 for (const f of [
-  "js/locales/en-GB.js", "js/locales/es.js", "js/locales/de.js", "js/locales/fr.js", "js/locales/pt.js", "js/locales/it.js",
-  "js/i18n.js", "js/rng.js", "js/rules.js", "js/content.js", "js/session.js",
+  "js/rng.js", "js/rules.js", "js/content.js", "js/session.js",
 ]) loadClassic(f);
 
 // -- The shapes this client reads -------------------------------------------------
@@ -85,17 +84,8 @@ interface RngApi {
   hashString(s: string): number;
   STREAM_DECOR: number;
 }
-interface I18nApi {
-  T(key: string, vars?: Record<string, string | number> | null): string;
-  setLocale(tag: string): void;
-  readonly lang: string;
-  LOCALES: string[];
-  DICTS: Record<string, Record<string, string>>;
-}
-
-const g = globalThis as unknown as { CPRules: RulesApi; CPContent: ContentApi; CPSession: SessionApi; CPRNG: RngApi; CPI18n: I18nApi };
+const g = globalThis as unknown as { CPRules: RulesApi; CPContent: ContentApi; CPSession: SessionApi; CPRNG: RngApi };
 export const Rules = g.CPRules;
 export const Content = g.CPContent;
 export const Sess = g.CPSession;
 export const RNG = g.CPRNG;
-export const I18n = g.CPI18n;

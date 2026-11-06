@@ -95,8 +95,8 @@
 .level-mastery:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .card-name { color: var(--ink); font-size: 16px; font-weight: 600; }
 .card-meta { color: var(--ink-soft); font-size: 13.6px; }
-.stars { color: var(--gold); font-size: 16px; }
-.stars-big { color: var(--gold); font-size: 22.4px; letter-spacing: 2px; }
+.stars { color: var(--gold); font-size: 16px; font-family: "StarHermit Emoji"; }
+.stars-big { color: var(--gold); font-family: "StarHermit Emoji"; font-size: 22.4px; letter-spacing: 2px; }
 
 /* ------------------------------------------------------------- overlays */
 .countdown { color: #ffffff; font-size: 96px; font-weight: 800; text-shadow: 0 4px 24px #00000088; }

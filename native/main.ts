@@ -25,7 +25,7 @@ import * as ui from "starhermit:ui";
 import { onSessionEnded, requestSignIn } from "starhermit:platform";
 import { Content, RNG, Rules, Sess, type Cfg, type Lesson, type RoundSession, type RulesEvent, type State, type Theme } from "./classic.ts";
 import * as audio from "./audio.ts";
-import { N, T, onLocaleChange } from "./i18n.ts";
+import { N, SH, T } from "./i18n.ts";
 import * as platform from "./platform.ts";
 import { lookFor } from "./quality.ts";
 import * as render from "./render.ts";
@@ -414,9 +414,9 @@ function postToLeaderboard(total: number): void {
 export function leaderboardLine(): string | null {
   const r = app.lb;
   if (!r) return null;
-  if (r === "posting") return T("Posting score to the leaderboard…");
-  if (!r.posted) return T("Score not posted to the leaderboard.");
-  return r.rank ? T("Leaderboard rank: #{rank}", { rank: r.rank }) : T("Score posted to the leaderboard.");
+  if (r === "posting") return SH("leaderboardPosting");
+  if (!r.posted) return SH("leaderboardNotPosted");
+  return r.rank ? SH("leaderboardRank", { rank: r.rank }) : SH("leaderboardPosted");
 }
 export function submitDailyScore(): void {
   const s = app.session;
@@ -596,8 +596,8 @@ export function copyInvite(): void {
   click();
   const link = platform.inviteLink();
   if (!link) return;
-  try { clipboard.writeText(link); toast(T("Invite link copied to the clipboard.")); }
-  catch { toast(T("Could not copy — invite link: {link}", { link }), 6, link); }
+  try { clipboard.writeText(link); toast(SH("inviteCopied")); }
+  catch { toast(SH("inviteLink", { link }), 6, link); }
 }
 export function signIn(): void { void requestSignIn().catch(() => undefined); }
 
@@ -605,7 +605,6 @@ export function signIn(): void { void requestSignIn().catch(() => undefined); }
 function refreshTheme(): void { if (app.session) applyTheme(app.session.cfg); }
 platform.onSettingsChange(refreshTheme);
 platform.onProgressMerged(() => toast(T("progress synced")));
-onLocaleChange(() => undefined);
 
 // ------------------------------------------------------------------ input
 function moveFocus(dr: number, dc: number): void {

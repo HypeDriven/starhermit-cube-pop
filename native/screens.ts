@@ -19,7 +19,7 @@ import * as draw from "starhermit:draw";
 import * as ui from "starhermit:ui";
 import { TextureLoader, type Texture } from "starhermit:scene";
 import { Content, RNG, Rules, Sess, type DailyEntry } from "./classic.ts";
-import { T, currentLocale } from "./i18n.ts";
+import { SH, T, currentLocale } from "./i18n.ts";
 import * as platform from "./platform.ts";
 import * as render from "./render.ts";
 import {
@@ -33,12 +33,11 @@ import { ink } from "./style.ts";
 // ------------------------------------------------------------------ layout
 interface Layout { lw: number; lh: number; sc: number; ox: number; oy: number; wide: boolean; phone: boolean; shortLand: boolean }
 function layoutNow(): Layout {
-  const f = frame();
-  const sc = ui.preferences().scale;
-  const sa = f.safeArea;
-  const lw = Math.max(1, (f.width - sa.left - sa.right) / sc), lh = Math.max(1, (f.height - sa.top - sa.bottom) / sc);
+  const v = ui.viewport!();
+  const sc = v.scale;
+  const lw = Math.max(1, v.width), lh = Math.max(1, v.height);
   const shortLand = lw > lh && lh <= 500;
-  return { lw, lh, sc, ox: sa.left / sc, oy: sa.top / sc, wide: !shortLand && lw >= 1024, phone: lw < 600, shortLand };
+  return { lw, lh, sc, ox: v.x, oy: v.y, wide: !shortLand && lw >= 1024, phone: lw < 600, shortLand };
 }
 const lastHeight = new Map<string, number>();
 const pr = (): ui.UiPreferences => ui.preferences();
@@ -48,10 +47,10 @@ function textWidth(text: string, style: string | readonly string[], kind?: "butt
 const buttonWidth = (text: string, style: readonly string[]): number => textWidth(text, style, "button") + 4;
 
 /** Colour `idx`'s icon (js/content.js COLORS: ♥ ★ ▲ ◆ ☾ ✿) as text centred at (cx, cy), `r` its
- * radius in window pixels; a symbol the system's faces lack draws from the engine's StarHermit Emoji. */
+ * radius in window pixels, in the engine's StarHermit Emoji on every system. */
 function icon(idx: number, cx: number, cy: number, r: number, color: string): void {
   const ch = Content.COLORS[idx % Content.COLORS.length]!.icon, size = r * 2.2;
-  draw.text(ch, cx, cy - draw.measureText(ch, { size }).height / 2, { size, color, align: "center" });
+  draw.text(ch, cx, cy - draw.measureText(ch, { size, font: "StarHermit Emoji" }).height / 2, { size, color, align: "center", font: "StarHermit Emoji" });
 }
 interface Btn { id: string; text: string; style?: string[]; disabled?: boolean; act: () => void; width?: number }
 const PLAIN = ["btn"];
@@ -234,8 +233,8 @@ function titleScreen(L: Layout, top: number): void {
           }
         }, { spacing: g, width: menuW });
         const plat: Btn[] = [];
-        if (!platform.signedIn()) plat.push({ id: "btn-signin", text: T("Sign in with StarHermit"), act: signIn });
-        if (platform.inviteLink()) plat.push({ id: "btn-invite", text: T("Invite a friend"), act: copyInvite });
+        if (!platform.signedIn()) plat.push({ id: "btn-signin", text: SH("signIn"), act: signIn });
+        if (platform.inviteLink()) plat.push({ id: "btn-invite", text: SH("invite"), act: copyInvite });
         if (plat.length) flow("title-platform", plat, menuW, "center");
         const journeyDone = Content.JOURNEY.filter((l) => p.completed[l.id]).length;
         para(T("Journey {done}/{total} · {stars} stars · {ach}/{achTotal} achievements", {

@@ -9,15 +9,14 @@
 // the volumes, the mute and the voice limit): music → "music", the effects
 // and the room tone → "effects", the menu click → "interface"; the old
 // default bus levels (music 50 %, effects 80 %, ambience 40 %) are folded
-// into each sound's gain. The music's notes are rendered once into clips
-// (createClip) with the old oscillator envelope; the procedural stand-ins
-// the browser build played while a clip decoded are not ported (a live
-// synthesis graph makes clip loads fail on the engine's web runtime; the
-// arrow-exodus port's finding), so a clip still loading is silent. The
+// into each sound's gain. The music's notes are rendered once into clips by
+// the engine (OfflineAudioContext) with the old oscillator envelope; the
+// procedural stand-ins the browser build played while a clip decoded are not
+// ported, so a clip still loading is silent. The
 // clips all load at once in onStart (every loaded clip reaches the mixer,
 // natively and on the web); the room tone and the music start once the mixer
 // runs (in a browser after the first press).
-import { context, createClip, loadClip, play as playClip, type AudioClip, type Bus, type Sound } from "starhermit:audio";
+import { context, createClip, loadClip, OfflineAudioContext, play as playClip, type AudioClip, type Bus, type Sound } from "starhermit:audio";
 
 /** Marks an English caption key (translated where it is shown). */
 const N = (s: string): string => s;
@@ -67,14 +66,17 @@ export function cue(name: Cue, n = 0): void {
 // -- the music ---------------------------------------------------------------------------
 const RATE = 22050;
 /** js/audio.js's blip: a sine at full level at once, exponential to 0.001 over `dur`. */
-function noteClip(freq: number, dur: number): AudioClip {
-  const n = Math.round((dur + 0.02) * RATE);
-  const out = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const t = i / RATE;
-    out[i] = t < dur ? Math.sin(2 * Math.PI * freq * t) * Math.pow(0.001, t / dur) : 0;
-  }
-  return createClip([out], RATE);
+async function renderNote(freq: number, dur: number): Promise<AudioClip> {
+  const off = new OfflineAudioContext(1, Math.round((dur + 0.02) * RATE), RATE);
+  const osc = off.createOscillator();
+  osc.frequency.value = freq;
+  const gain = off.createGain();
+  gain.gain.setValueAtTime(1, 0);
+  gain.gain.exponentialRampToValueAtTime(0.001, dur);
+  gain.gain.setValueAtTime(0, dur);
+  osc.connect(gain).connect(off.destination);
+  osc.start();
+  return createClip(await off.startRendering());
 }
 const SCALES = [
   [262, 294, 330, 392, 440, 523], // C pentatonic
@@ -88,16 +90,27 @@ let musicOn = false;
 let scale = SCALES[0]!;
 let step = 0;
 let nextStep = 0;
-let nextRender = 0;
 let ambienceOn = false;
 let ambienceSound: Sound | null = null;
 let suspended = false;
+const rendering = new Set<string>();
+/** Renders a scale's notes and bass notes once (at most 12 contexts at a time); steps wait on the clips. */
+function renderScale(list: readonly number[]): void {
+  for (const f of list) {
+    for (const [k, freq, dur] of [[`${f}`, f, 0.5], [`${f}/2`, f / 2, 0.9]] as [string, number, number][]) {
+      if (rendering.has(k)) continue;
+      rendering.add(k);
+      renderNote(freq, dur).then((c) => { notes.set(k, c); }, (e: unknown) => console.warn(`music: ${String(e)}`));
+    }
+  }
+}
 
 /** The round's music, in the theme's scale (js/audio.js startMusic). */
 export function startMusic(themeIdx: number): void {
   if (musicOn) return;
   musicOn = true;
   scale = SCALES[Math.max(0, themeIdx) % SCALES.length]!;
+  renderScale(scale);
   nextStep = 0;
 }
 export function stopMusic(): void { musicOn = false; }
@@ -110,18 +123,10 @@ export function stopAmbience(): void {
 /** Pause and a hidden window: everything holds (js/audio.js suspendAll / resumeAll). */
 export function setSuspended(on: boolean): void { suspended = on; }
 
-/** Each frame once the mixer runs: the scale's notes rendered one each 0.3 s,
- * the room tone, then the music's steps by mixer time. */
+/** Each frame once the mixer runs: the room tone, then the music's steps by mixer time. */
 export function update(): void {
   if (context.state !== "running") return; // starting the room tone and music still waits for the mixer
   try {
-    if (context.currentTime >= nextRender) {
-      for (const f of scale) {
-        for (const [k, freq, dur] of [[`${f}`, f, 0.5], [`${f}/2`, f / 2, 0.9]] as [string, number, number][]) {
-          if (!notes.has(k)) { notes.set(k, noteClip(freq, dur)); nextRender = context.currentTime + 0.3; return; }
-        }
-      }
-    }
     const bed = clips.get(AMBIENCE);
     const want = ambienceOn && !suspended;
     if (want && bed && !ambienceSound) ambienceSound = playClip(bed, { bus: "effects", gain: 0.35 * LEVEL.ambience, loop: true });

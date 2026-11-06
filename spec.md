@@ -20,7 +20,6 @@
 | `js/rules.js` | Pure deterministic rules engine: `createGame`, `applyCommand`, legality, scoring, hints, hashing, serialisation |
 | `js/content.js` | Versioned content: 6 cube colours, 5 themes, 40 journey stages, 6 challenges, 3 practice presets, score-chase ruleset, daily generator, 7 lessons, 11 achievements |
 | `js/session.js` | Round lifecycle over the engine: command ids, undo stack, replay envelope, stars, the progress / achievement / snapshot documents in `localStorage` (the engine's shim), the device's daily board; `Session.clock` (the round clock hook) |
-| `js/i18n.js`, `js/locales/*.js` | `CPI18n`: `T(US-English text, vars)` over the per-language dictionaries |
 | `assets/` | `title-keyart.webp`, `results-banner.webp`, `table-wood.webp`, `ui-style.json` (generated from `tools/ui-style.css`) |
 | `sfx/` | 21 Opus clips, `manifest.txt` (canonical), `manifest.json` (generator input), `manifest.md` (generator output) |
 | `score-script.js` | StarHermit platform script (`server=`): range-checks a finished round's total and posts it to the `high-score` leaderboard |
@@ -211,7 +210,7 @@ Motes and bursts grow with the level's particle budget against the tier's anchor
 
 Nine locales ship: **en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, it-IT**, for every player-facing string — screens, settings, help, HUD, goals and colour names, announcements and captions, toasts, results, stage/challenge/lesson/achievement/theme names and intros, and the StarHermit lines. "Cube Pop" stays untranslated.
 
-- **Strings.** Code calls `T('US-English text', { vars })` (`native/i18n.ts` over `js/i18n.js`'s `CPI18n`); `js/locales/*.js` map that text per language (en-GB lists only the colour spellings; es-ES and fr-CA only their differences from es-419 and fr-FR). Content tables keep English source text and are translated at display time.
+- **Strings.** Code calls `T('US-English text', { vars })` (`native/i18n.ts` over the engine's string tables); `assets/strings.json` maps that text per language (en-GB lists only the colour spellings); shared account lines are the engine's `starhermit.*`. Content tables keep English source text and are translated at display time.
 - **Language** is the runtime's interface language (`preferences().language`: the player's choice in Options › Language, else the account's preferred language or the device's), mapped to the nearest shipped locale; a change re-renders everything on the next frame (the UI is rebuilt every frame) and leaves the round untouched. The browser build's own Language selector and its `ui.language` account key are gone (the key is removed on first run).
 - **Expansion.** Cards, the tray, button rows and goals wrap; long labels wrap inside their buttons; pages and dialogs scroll.
 
