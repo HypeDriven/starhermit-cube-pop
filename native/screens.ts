@@ -1,3 +1,4 @@
+import { bindings } from "starhermit:input";
 import { localizedStyle as __l10nStyle } from "./l10n/font.ts";
 import { localizedDrawOptions as __l10nDrawOptions } from "./l10n/font.ts";
 // localization-runtime:attached
@@ -160,7 +161,7 @@ function hero(w: number, h: number): void {
 }
 
 // ------------------------------------------------------------------ the frame
-export function drawScreens(): void {
+function drawScreensImmediate(): void {
   loadArt();
   const L = layoutNow();
   const f = frame();
@@ -804,4 +805,11 @@ function toasts(L: Layout): void {
     const text = app.caption.text;
     ui.place("captions", { anchor: "bottom", y: Math.max(y, bottom + 54) }, () => para(text, Math.min(L.lw - 40, 520), "captions", "caption-text", true));
   }
+}
+
+export function drawScreens(): void {
+  if (app.screen !== "help") { drawScreensImmediate(); return; }
+  const actions = ["up","down","left","right","pop","hint","undo","pause","camera"];
+  const version = JSON.stringify([(app as any).settings ?? (app as any).options ?? {}, (platform as any).options ?? {}, actions.map((action) => bindings(action))]);
+  ui.retain!("help-screen", version, drawScreensImmediate);
 }

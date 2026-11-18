@@ -79,7 +79,8 @@ export function announce(text: string, assertive = false): void {
 }
 /** js/ui.js toast(): 2.6 s by default; `selectable` (an invite link) stays readable in it. */
 export function toast(text: string, seconds = 2.6, selectable?: string): void {
-  app.toast = { text, until: now() + seconds, ...(selectable ? { selectable } : {}) };
+  if (selectable) { app.toast = { text, until: now() + seconds, selectable }; return; }
+  ui.toast!(text, { duration: seconds, position: "bottom", offset: 16, style: "toast", dismissible: false });
 }
 export function click(): void { audio.cue("click"); }
 export function highContrast(): boolean { return ui.preferences().highContrast; }

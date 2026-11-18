@@ -2,12 +2,12 @@
 
 **Pitch:** Tap a cluster of matching toy cubes to pop it; pop five to forge a rocket, eight to forge a bomb, and set them off in chains to fill colour quotas on a cheerful 3D toy-studio wall.
 **Genre:** Cluster-pop puzzle (single tap, gravity refill, colour quotas). **Players:** 1, with a per-device daily board. **Session:** 1–4 minutes per round; 40-stage journey, 6 challenges, 7 lessons, daily seed, endless score chase.
-**Platforms:** a StarHermit engine script game (engine 1.39.0, host API 1.39, `engine.minor=39`): played natively by the StarHermit client and in desktop and mobile browsers by the engine's web runtime; portrait and landscape, keyboard, mouse, touch and gamepad.
+**Platforms:** a StarHermit engine script game (engine 1.44.1, host API 1.44, `engine.minor=44`): played natively by the StarHermit client and in desktop and mobile browsers by the engine's web runtime; portrait and landscape, keyboard, mouse, touch and gamepad.
 **Rendering:** `starhermit:scene` (three.js-like) draws an instanced wall of rounded cubes in a lit toy studio; every menu, HUD element and dialog is `starhermit:ui` (immediate mode, styled from `assets/ui-style.json`), with an accessibility tree screen readers read (each cube is a named target).
 
 | Path | Responsibility |
 |---|---|
-| `starhermit.txt` | Manifest: name, owner, `server=score-script.js`, cover, `launch=index.html`, `engine.entry=native/main.ts`, engine 1.39.0 / minor 32, capabilities `platform,storage,clipboard`, `control.*` keys and `engine.gamepad.*` buttons for every action |
+| `starhermit.txt` | Manifest: name, owner, `server=score-script.js`, cover, `launch=index.html`, `engine.entry=native/main.ts`, engine 1.44.1 / minor 32, capabilities `platform,storage,clipboard`, `control.*` keys and `engine.gamepad.*` buttons for every action |
 | `index.html`, `starhermit-files.json` | The web loader and file index written by `npm run package` (`starhermit package --web .`; pins the engine on wiki.starhermit.com by hash — never edit them) |
 | `native/main.ts` | Entry: state machine (title → lists → countdown → active ⇄ paused → resolving → results), round lifecycle and snapshot, event presentation, lessons, input (actions, wall taps and drag orbit), the fixed-step round clock, time limits, results, lifecycle |
 | `native/screens.ts` | Every screen, the HUD, the countdown, pause and results dialogs, toasts and captions (starhermit:ui), layouts by window size |
@@ -302,3 +302,11 @@ The browser build's unused `assets/toy-rocket.glb` (1.4 MB, never loaded) was re
 The string tables include complete regional variants for `fr-BE`, `de-BE`, `en-SG`, `en-HK`, `en-BQ`, `es-CO`, `de-IT`, `fr-IT`, `es-CL`, `es-AR`, `es-EC`, `de-BR`. These reuse the corresponding existing translations in their language family. The runtime can resolve the exact regional tag. Language selection is available from the game’s Options panel or F2 and is saved per player in `ui.language`. Changes apply during play. Additional national, regional and indigenous language packs are only shipped once every English message has a translation with intact placeholders and markup. Complete additional language tables: `ja-JP`, `nl-BE`, `zh-SG`, `ms-SG`, `zh-HK`, `yue-HK`, `nl-NL`, `fi-FI`, `sv-FI`, `et-EE`, `id-ID`, `vi-VN`, `ta-SG`, `ru-FI`, `ru-EE`, `su-ID`, `da-DE`, `lb-BE`, `co-FR`, `eu-FR`, `ca-FR`, `oc-FR`, `sl-IT`, `fur-IT`, `ca-IT`, `oc-IT`, `ca-ES`, `eu-ES`, `gl-ES`, `bew-ID`, `km-VN`.
 
 <!-- regional-localization:end -->
+
+## Engine 1.44.1
+
+Browser play uses the WebGPU-only StarHermit 1.44.1 web runtime. Automatic ray-traced shadows are enabled on supported Vulkan devices, with mapped-shadow fallbacks elsewhere. Packaging creates block-compressed runtime textures and compressed glTF copies, retaining original image fallbacks.
+
+The help screen replays through retained native UI while its contents, options, layout and key bindings are unchanged.
+
+Ordinary toasts use native engine stacking, styling, accessibility and lifetime management; selectable invite-link notifications retain their interactive custom presentation.
