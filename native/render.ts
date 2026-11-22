@@ -720,6 +720,7 @@ export function applyLook(next: Look): void {
     vignette: { amount: 0.2, inner: 0.38, outer: 0.9, scale: [1, 0.85] },
   } : null;
   renderer.antialias = next.antialias;
+  renderer.motionBlur = next.bloom !== null ? { intensity: 0.25, samples: 8, maxPixels: 16, targetFps: 60, camera: false } : null;
   // Asset variants (material class, cube LOD, textures) are built into the meshes: build them again.
   const b = before?.budget;
   const assets = !b || before!.detailed !== next.detailed || b.material !== next.budget.material || b.cubeCurve !== next.budget.cubeCurve
