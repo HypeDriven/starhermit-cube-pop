@@ -12,7 +12,7 @@
     "metadataSource": "starhermit.txt",
     "createdAt": "2026-09-01T07:00:59.832983+00:00",
     "coverArtSource": "manifest",
-    "coverArtUpdatedAt": "2026-11-23T17:01:34.814435+00:00",
+    "coverArtUpdatedAt": "2026-11-26T12:33:07.095813+00:00",
     "submittedByUserId": "2712e04e-461b-4d23-81ae-e40b429128a8",
     "submittedByUsername": "starhermit",
     "hosting": {
@@ -22,9 +22,9 @@
       "pinnedCommitSha": null,
       "deployedCommitSha": null,
       "deployError": null,
-      "deployedAt": "2026-11-23T17:01:34.803664+00:00",
+      "deployedAt": "2026-11-26T12:33:07.082811+00:00",
       "externalLaunchUrl": null,
-      "engineVersion": "1.47.0",
+      "engineVersion": "1.50.0",
       "deployWarning": null
     },
     "description": "Pop groups of matching toy cubes and combine rockets and bombs to meet each board's color goals.",
@@ -36,19 +36,19 @@
     "links": [],
     "isDisabled": false
   },
-  "publishedAt": "2026-11-23T17:01:34.926Z",
-  "sourceCommit": "9709ba1b901accceff12026c09ffe4d58631c940",
-  "bytesReceived": 2286352,
-  "archiveSha256": "7e3410cce8b46157b7c24a041e50be0bd28343cc26987ca9a0718898bda11b6c",
+  "publishedAt": "2026-11-26T12:33:07.318Z",
+  "sourceCommit": "62c47784325ab9bd7e516a35dc3dd99d1cbd9465",
+  "bytesReceived": 2286390,
+  "archiveSha256": "c4b1be1c8a50a7e9565054f42b6295402b3b72cae49e0e721e7fb6d9b350b994",
   "indexSha256": "ba03eee1ee524bd2bc8f213aa2dbf4941f5ab1ef681d95b45e16eea10bcdb5fb",
   "result": {
     "clientPublished": true,
     "serverImageLoaded": false,
     "imageDigest": null,
-    "bytesReceived": 2286352,
+    "bytesReceived": 2286390,
     "mode": "replace",
     "filesRemoved": 0,
-    "engineVersion": "1.47.0",
+    "engineVersion": "1.50.0",
     "deployWarning": null
   },
   "liveVerification": {
